@@ -1,41 +1,85 @@
-'use client';
+"use client";
 
-import GoogleLoginButton from '@/components/GoogleLoginButton';
-import { Compass } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import GoogleLoginButton from "@/components/GoogleLoginButton";
+import { supabase } from "@/lib/supabaseClient";
+import { getBackendProfile } from "@/services/api";
+import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    async function checkExistingSession() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          try {
+            localStorage.setItem("access_token", session.access_token);
+            const profile = await getBackendProfile(session.access_token);
+            if (profile) {
+              router.push("/dashboard");
+              return;
+            } else {
+              router.push("/onboarding");
+              return;
+            }
+          } catch (profileErr) {
+            console.log("Sesión previa expirada o no válida en backend:", profileErr);
+            localStorage.removeItem("access_token");
+            await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+          }
+        }
+      } catch (err) {
+        console.error("Error comprobando sesión en login:", err);
+      } finally {
+        setChecking(false);
+      }
+    }
+    checkExistingSession();
+  }, [router]);
+
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface-container-low">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 py-12 dark:bg-zinc-950">
-      <div className="w-full max-w-md space-y-8 rounded-2xl border border-zinc-100 bg-white p-8 shadow-sm dark:border-zinc-900 dark:bg-zinc-900">
-        <div className="flex flex-col items-center text-center">
-          {/* Logo o Icono de la plataforma */}
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900">
-            <Compass className="h-6 w-6 animate-pulse" />
-          </div>
-          <h2 className="mt-6 text-2xl font-bold tracking-tight text-zinc-950 dark:text-white">
-            Ingresar a SmartPath
-          </h2>
-          <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-            Accede a tu plataforma de forma rápida y segura
-          </p>
+    <div className="relative mx-auto w-[90%] sm:w-[440px] px-4 py-20">
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-primary-container/20 blur-3xl" />
+        <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-secondary-container/20 blur-3xl" />
+      </div>
+
+      <div className="surface-card p-8 text-center bg-white">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center">
+          <img src="/favicon.png" alt="SmartPath Logo" className="h-20 w-auto object-contain" />
         </div>
+        <h1 className="mt-5 text-2xl font-bold text-on-surface">Bienvenido a SmartPath</h1>
+        <p className="mt-2 text-sm text-on-surface-variant">
+          Tu ruta inteligente hacia el empleo tech. Inicia sesión para empezar.
+        </p>
 
         <div className="mt-8 space-y-6">
           <div className="relative flex items-center justify-center">
             <div className="absolute inset-0 flex items-center" aria-hidden="true">
-              <div className="w-full border-t border-zinc-200 dark:border-zinc-800" />
+              <div className="w-full border-t border-outline-variant" />
             </div>
-            <div className="relative bg-white px-4 text-xs font-semibold text-zinc-400 uppercase dark:bg-zinc-900">
+            <div className="relative bg-white px-4 text-xs font-semibold text-on-surface-variant uppercase">
               Método de acceso
             </div>
           </div>
 
-          {/* Botón interactivo de OAuth */}
           <GoogleLoginButton />
         </div>
 
-        <p className="mt-8 text-center text-xs text-zinc-400 dark:text-zinc-500">
-          Al iniciar sesión, aceptas nuestros Términos de Servicio y Políticas de Privacidad.
+        <p className="mt-8 text-center text-xs text-on-surface-variant">
+          Al continuar aceptas nuestros términos. Este es un MVP: los datos se guardan en tu navegador de forma segura.
         </p>
       </div>
     </div>

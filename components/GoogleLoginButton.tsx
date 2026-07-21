@@ -14,6 +14,9 @@ export default function GoogleLoginButton() {
         options: {
           // Redirige al usuario a la ruta de procesamiento dentro de Next.js
           redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            prompt: 'select_account',
+          },
         },
       });
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
+import { getBackendProfile } from '@/services/api';
 import { Loader2 } from 'lucide-react';
 
 export default function AuthCallback() {
@@ -17,10 +18,25 @@ export default function AuthCallback() {
         if (error) throw error;
 
         if (session) {
-          // Guardar opcionalmente el token de acceso en LocalStorage o Cookies para llamadas a tu FastAPI
           localStorage.setItem('access_token', session.access_token);
           
-          router.push('/dashboard');
+          // Pausa corta para prevenir errores por desfase de reloj (clock skew) de 1s con el servidor
+          await new Promise((res) => setTimeout(res, 600));
+
+          let profile = null;
+          try {
+            profile = await getBackendProfile(session.access_token);
+          } catch {
+            // Reintento tras 1s si el servidor rechazó por desfase temporal de emisión
+            await new Promise((res) => setTimeout(res, 1000));
+            profile = await getBackendProfile(session.access_token);
+          }
+
+          if (profile) {
+            router.push('/dashboard');
+          } else {
+            router.push('/onboarding');
+          }
         } else {
           router.push('/login');
         }
