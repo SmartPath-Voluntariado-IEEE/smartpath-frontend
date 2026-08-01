@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
 import { getCatalogJobs, getCatalogSkills } from "@/services/api";
-
+import { useProfile } from "@/hooks/use-profile";
 const DEFAULT_JOBS = [
   { id: 1, company: "Rappi Perú", position: "Practicante Backend Developer", location: "Lima, Remoto", seniority: "Practicante", description: "Java, Spring Boot, REST APIs, Git, Docker, PostgreSQL." },
   { id: 2, company: "BCP", position: "Practicante Data Analyst", location: "Lima, Perú", seniority: "Practicante", description: "SQL, Excel, Power BI, Python, Pandas." },
@@ -85,6 +85,8 @@ export default function LandingPage() {
   const [jobs, setJobs] = useState<any[]>([]);
   const [skills, setSkills] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { profile, hydrated } = useProfile();
+  const isAuthed = hydrated && !!profile;
 
   useEffect(() => {
     async function loadData() {
@@ -133,8 +135,11 @@ export default function LandingPage() {
               y arma un roadmap priorizado para que llegues listo a tu próxima entrevista.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/login" className="inline-flex h-11 items-center justify-center rounded-full px-6 bg-primary text-white hover:bg-primary/90 text-sm font-semibold">
-                Empezar gratis
+              <Link
+                href={isAuthed ? "/dashboard" : "/login"}
+                className="inline-flex h-11 items-center justify-center rounded-full px-6 bg-primary text-white hover:bg-primary/90 text-sm font-semibold"
+              >
+                {isAuthed ? "Visualizar dashboard" : "Empezar gratis"}
               </Link>
               <Link href="/dashboard" className="inline-flex h-11 items-center justify-center rounded-full px-6 border border-outline-variant text-on-surface hover:bg-surface-container-low bg-white text-sm font-semibold">
                 Ver demo del dashboard

@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+
 import { useProfile } from "@/hooks/use-profile";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
+import { usePathname, useRouter } from "next/navigation";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard" },
@@ -17,6 +18,7 @@ export function AppHeader() {
   const pathname = usePathname();
   const { profile, hydrated, clear } = useProfile();
   const isAuthed = hydrated && !!profile;
+  const router = useRouter();
 
   // Ocultar el navbar durante el flujo de onboarding
   if (pathname === "/onboarding") {
@@ -27,6 +29,7 @@ export function AppHeader() {
     await supabase.auth.signOut({ scope: "local" }).catch(() => {});
     localStorage.removeItem("access_token");
     clear();
+    router.push("/");
   };
 
   return (
