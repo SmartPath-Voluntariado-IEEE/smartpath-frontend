@@ -73,6 +73,11 @@ export default function RoadmapPage() {
   }
 
   const totalHours = roadmap.reduce((a: number, l: any) => a + l.skills.reduce((x: number, s: any) => x + s.estHours, 0), 0);
+  const weeklyHours = profile.availabilityHours || 10;
+  const targetMonths = profile.targetMonths || 6;
+  const estimatedWeeks = Math.ceil(totalHours / weeklyHours);
+  const estimatedMonths = Math.max(1, Math.ceil(estimatedWeeks / 4.33));
+
   const coursesForSkill = (skillSlug: string) => {
     return courses.filter((c) => c.skill_slugs.includes(skillSlug));
   };
@@ -85,6 +90,16 @@ export default function RoadmapPage() {
         <p className="mt-2 text-on-surface-variant">
           {roadmap.length} niveles · ~{totalHours}h estimadas · basado en {gap.missing.length + gap.partial.length} skills por reforzar.
         </p>
+
+        {/* Ritmo y plazo objetivo sincronizados con perfil del backend (HU2 y HU3) */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Badge variant="outline" className="border-primary/40 text-primary bg-primary/5 font-medium">
+            ⏱️ Ritmo: {weeklyHours}h / semana
+          </Badge>
+          <Badge variant="outline" className="border-purple-300 text-purple-700 bg-purple-50 font-medium">
+            🎯 Meta objetivo: {targetMonths} meses (Tiempo est: ~{estimatedMonths} meses)
+          </Badge>
+        </div>
       </header>
 
       {roadmap.length === 0 ? (

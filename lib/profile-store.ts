@@ -11,6 +11,7 @@ export interface UserProfile {
   cycle: string; // "8", "9", "10"
   availabilityHours: number; // weekly_hours
   goal: string; // professional_goal
+  targetMonths?: number; // HU3: meta profesional en meses (3, 6, 12)
 
   // Campos locales / mock (sincronización a futuro)
   targetRoleId: string;
@@ -38,6 +39,7 @@ export const defaultProfile: UserProfile = {
   learningPreferences: [],
   availabilityHours: 10,
   goal: "",
+  targetMonths: 6,
   languages: ["Español"],
   certifications: [],
   skills: [],

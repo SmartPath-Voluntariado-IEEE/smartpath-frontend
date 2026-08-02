@@ -214,15 +214,15 @@ export default function OnboardingPage() {
   }
 
   function submitAvailability(availabilityHours: number) {
-    setMessages((m) => [...m, { role: "user", text: `${availabilityHours} horas semanales`, id: crypto.randomUUID() }]);
+    setMessages((m) => [...m, { role: "user", text: `${availabilityHours} horas por semana`, id: crypto.randomUUID() }]);
     setDraft((d) => ({ ...d, availabilityHours }));
-    pushBot(`Para finalizar, ¿cuál es tu principal meta a corto plazo? (Ej: conseguir mis primeras prácticas en una fintech).`);
+    pushBot(`Para finalizar, ¿cuál es tu meta profesional y en cuántos meses deseas alcanzarla?`);
     advance("goal");
   }
 
-  async function submitGoal(goal: string) {
-    setMessages((m) => [...m, { role: "user", text: goal, id: crypto.randomUUID() }]);
-    const final = { ...draft, goal, onboardingComplete: true };
+  function submitGoal(goal: string, targetMonths: number) {
+    setMessages((m) => [...m, { role: "user", text: `${goal} (Meta a ${targetMonths} meses)`, id: crypto.randomUUID() }]);
+    const final = { ...draft, goal, targetMonths, onboardingComplete: true };
     setDraft(final);
     pushBot(`¡Todo listo! Revisa que tu información esté correcta para generar tu ruta personalizada.`);
     advance("confirm");
@@ -358,7 +358,7 @@ interface StepInputProps {
   onExperience: (e: ExperienceKind[]) => void;
   onLearning: (p: LearningPreference[]) => void;
   onAvailability: (h: number) => void;
-  onGoal: (v: string) => void;
+  onGoal: (goal: string, months: number) => void;
   onConfirm: () => void;
 }
 
@@ -453,9 +453,9 @@ function StepInput(p: StepInputProps) {
       return <AvailabilityPicker initial={p.draft.availabilityHours} onSubmit={p.onAvailability} />;
     case "goal":
       return (
-        <TextComposer
-          placeholder="Ej: conseguir mi primera práctica como Frontend en una fintech"
-          defaultValue={p.draft.goal}
+        <GoalComposer
+          defaultGoal={p.draft.goal}
+          defaultMonths={p.draft.targetMonths || 6}
           onSubmit={p.onGoal}
         />
       );
@@ -647,24 +647,127 @@ function SkillsPicker({
 
 function AvailabilityPicker({ initial, onSubmit }: { initial: number; onSubmit: (h: number) => void }) {
   const [h, setH] = useState(initial || 10);
+  const presetOptions = [5, 10, 15, 20];
+
   return (
-    <div>
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-sm text-on-surface-variant">Horas por semana</span>
-        <span className="text-lg font-bold gradient-text">{h}h</span>
+    <div className="space-y-3">
+      <div>
+        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
+          Selección rápida
+        </label>
+        <div className="flex items-center gap-2">
+          {presetOptions.map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => setH(opt)}
+              className={`flex-1 rounded-xl border py-2 text-sm font-semibold transition ${
+                h === opt
+                  ? "border-primary bg-primary text-white shadow-sm"
+                  : "border-outline-variant bg-white text-on-surface hover:border-primary/60 hover:bg-primary/5"
+              }`}
+            >
+              {opt === 20 ? "20+" : opt}
+            </button>
+          ))}
+        </div>
       </div>
-      <input
-        type="range"
-        min={2}
-        max={40}
-        step={1}
-        value={h}
-        onChange={(e) => setH(Number(e.target.value))}
-        className="mb-3 w-full accent-primary"
-      />
-      <div className="flex justify-end">
-        <Button onClick={() => onSubmit(h)} className="gradient-brand text-white hover:opacity-90">Continuar</Button>
+
+      <div className="rounded-xl border border-outline-variant bg-white p-3 shadow-xs">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-xs font-medium text-on-surface-variant">Horas dedicadas</span>
+          <span className="rounded-md bg-primary/10 px-2.5 py-0.5 text-sm font-bold text-primary">
+            {h} horas / semana
+          </span>
+        </div>
+        <input
+          type="range"
+          min={2}
+          max={40}
+          step={1}
+          value={h}
+          onChange={(e) => setH(Number(e.target.value))}
+          className="w-full accent-primary cursor-pointer"
+        />
       </div>
+
+      <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-2.5 text-xs text-amber-900 shadow-xs">
+        <span className="text-base">💡</span>
+        <span>
+          <strong>Sé realista</strong>, así te recomendaremos la mejor ruta para ti.
+        </span>
+      </div>
+
+      <div className="flex justify-end pt-1">
+        <Button onClick={() => onSubmit(h)} className="gradient-brand text-white hover:opacity-90">
+          Continuar
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function GoalComposer({
+  defaultGoal,
+  defaultMonths,
+  onSubmit,
+}: {
+  defaultGoal: string;
+  defaultMonths: number;
+  onSubmit: (goal: string, months: number) => void;
+}) {
+  const [goal, setGoal] = useState(defaultGoal || "");
+  const [months, setMonths] = useState(defaultMonths || 6);
+
+  const monthOptions = [
+    { value: 3, label: "3 meses", desc: "Intensivo" },
+    { value: 6, label: "6 meses", desc: "Recomendado" },
+    { value: 12, label: "12 meses", desc: "Flexible" },
+  ];
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
+          ¿En qué tiempo esperas lograr tu meta?
+        </label>
+        <div className="grid grid-cols-3 gap-2">
+          {monthOptions.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setMonths(opt.value)}
+              className={`flex flex-col items-center justify-center rounded-xl border p-2.5 text-center transition ${
+                months === opt.value
+                  ? "border-primary bg-primary/10 text-primary font-bold shadow-xs"
+                  : "border-outline-variant bg-white text-on-surface hover:border-primary/60"
+              }`}
+            >
+              <span className="text-sm font-semibold">{opt.label}</span>
+              <span className="text-[10px] text-on-surface-variant">{opt.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (goal.trim()) onSubmit(goal, months);
+        }}
+        className="flex gap-2"
+      >
+        <Input
+          value={goal}
+          onChange={(e) => setGoal(e.target.value)}
+          placeholder="Ej: conseguir mi primera práctica como Frontend en una fintech"
+          className="flex-1 bg-white"
+          autoFocus
+        />
+        <Button type="submit" disabled={!goal.trim()} className="gradient-brand text-white hover:opacity-90">
+          Enviar
+        </Button>
+      </form>
     </div>
   );
 }
@@ -672,35 +775,51 @@ function AvailabilityPicker({ initial, onSubmit }: { initial: number; onSubmit: 
 function ConfirmPanel({ draft, onConfirm, roles }: { draft: UserProfile; onConfirm: () => void; roles: any[] }) {
   const activeRoles = roles && roles.length > 0 ? roles : DEFAULT_ROLES;
   const role = activeRoles.find((r) => r.id === draft.targetRoleId);
+
+  const preferenceLabels: Record<string, string> = {
+    video: "Videos 📺",
+    lectura: "Lectura 📖",
+    practica: "Práctica 🛠️",
+    comunidad: "Comunidad 👥",
+  };
+
+  const selectedPrefs = (draft.learningPreferences || [])
+    .map((p) => preferenceLabels[p] || p)
+    .join(", ");
+
   return (
-    <div className="space-y-2 text-sm text-on-surface">
-      <div className="grid gap-1.5 rounded-lg border border-outline-variant bg-white p-3">
+    <div className="space-y-3 text-sm text-on-surface">
+      <div className="grid gap-2 rounded-xl border border-outline-variant bg-white p-3.5 shadow-xs">
         <div className="flex items-start justify-between gap-3">
-          <span className="shrink-0 text-xs uppercase tracking-wider text-on-surface-variant">Nombre</span>
+          <span className="shrink-0 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Nombre</span>
           <span className="text-right text-sm font-medium">{draft.fullName || "—"}</span>
         </div>
         <div className="flex items-start justify-between gap-3">
-          <span className="shrink-0 text-xs uppercase tracking-wider text-on-surface-variant">Carrera</span>
+          <span className="shrink-0 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Carrera</span>
           <span className="text-right text-sm font-medium">{`${draft.career} · ${draft.cycle}° ciclo`}</span>
         </div>
         <div className="flex items-start justify-between gap-3">
-          <span className="shrink-0 text-xs uppercase tracking-wider text-on-surface-variant">Objetivo</span>
+          <span className="shrink-0 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Rol Objetivo</span>
           <span className="text-right text-sm font-medium">{role?.label ?? ""}</span>
         </div>
         <div className="flex items-start justify-between gap-3">
-          <span className="shrink-0 text-xs uppercase tracking-wider text-on-surface-variant">Habilidades</span>
-          <span className="text-right text-sm font-medium">{`${draft.skills.length} registradas`}</span>
+          <span className="shrink-0 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Estilo de Estudio</span>
+          <span className="text-right text-sm font-medium">{selectedPrefs || "No especificado"}</span>
         </div>
         <div className="flex items-start justify-between gap-3">
-          <span className="shrink-0 text-xs uppercase tracking-wider text-on-surface-variant">Disponibilidad</span>
+          <span className="shrink-0 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Disponibilidad</span>
           <span className="text-right text-sm font-medium">{`${draft.availabilityHours}h / semana`}</span>
         </div>
         <div className="flex items-start justify-between gap-3">
-          <span className="shrink-0 text-xs uppercase tracking-wider text-on-surface-variant">Meta 6m</span>
+          <span className="shrink-0 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Plazo Objetivo</span>
+          <span className="text-right text-sm font-medium">{`${draft.targetMonths || 6} meses`}</span>
+        </div>
+        <div className="flex items-start justify-between gap-3">
+          <span className="shrink-0 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Meta Profesional</span>
           <span className="text-right text-sm font-medium">{draft.goal || "—"}</span>
         </div>
       </div>
-      <div className="flex justify-end pt-2">
+      <div className="flex justify-end pt-1">
         <Button onClick={onConfirm} size="lg" className="gradient-brand text-white hover:opacity-90">
           Generar mi ruta 🚀
         </Button>
