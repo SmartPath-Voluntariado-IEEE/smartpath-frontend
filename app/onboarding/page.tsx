@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useProfile } from "@/hooks/use-profile";
@@ -8,10 +8,21 @@ import { defaultProfile, type UserProfile, type LearningPreference, type Experie
 import { type SkillLevel } from "@/lib/smartpath-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { supabase } from "@/lib/supabaseClient";
-import { upsertBackendProfile, getCatalogSkills, getCatalogRoles } from "@/services/api";
+import {
+  upsertBackendProfile,
+  getCatalogSkills,
+  getCatalogRoles,
+  startOnboarding,
+  saveOnboardingName,
+  saveOnboardingCareer,
+  saveOnboardingStage,
+  saveOnboardingInterests,
+  saveOnboardingTargetRole,
+  getOnboardingInterestAreas,
+  type OnboardingOption,
+  type OnboardingStepResponse,
+} from "@/services/api";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { Loader2 } from "lucide-react";
 
@@ -50,25 +61,44 @@ const DEFAULT_SKILLS = [
   { id: 22, slug: "kubernetes", name: "Kubernetes", category: "tool" }
 ];
 
-const INTERESTS: { id: string; label: string; emoji: string; roles: string[]; skills: string[] }[] = [
-  { id: "backend", label: "Backend / APIs", emoji: "🧱", roles: ["backend", "fullstack"], skills: ["java", "python", "nodejs", "springboot", "sql", "docker", "rest"] },
-  { id: "frontend", label: "Frontend / UI", emoji: "🎨", roles: ["frontend", "fullstack"], skills: ["javascript", "typescript", "react", "nextjs", "tailwind"] },
-  { id: "data", label: "Datos / Analytics", emoji: "📊", roles: ["data-analyst", "data-engineer"], skills: ["sql", "python", "excel", "powerbi", "pandas"] },
-  { id: "ml", label: "Machine Learning / IA", emoji: "🤖", roles: ["ml", "data-engineer"], skills: ["python", "pandas", "tensorflow", "sql"] },
-  { id: "cloud", label: "Cloud / DevOps", emoji: "☁️", roles: ["devops", "backend"], skills: ["linux", "docker", "kubernetes", "aws", "gcp", "git"] },
-  { id: "mobile", label: "Mobile", emoji: "📱", roles: ["frontend", "fullstack"], skills: ["javascript", "typescript", "react"] },
-];
+/**
+ * Skills que proponemos calificar según las áreas que el usuario eligió en la
+ * HU-30. Las claves son los ids que devuelve GET /onboarding/interest-areas.
+ */
+const INTEREST_SKILL_HINTS: Record<string, string[]> = {
+  "data-analytics": ["sql", "python", "excel", "powerbi", "pandas"],
+  frontend: ["javascript", "typescript", "react", "nextjs", "tailwind"],
+  backend: ["java", "python", "nodejs", "springboot", "sql", "docker", "rest"],
+  "cloud-devops": ["linux", "docker", "kubernetes", "aws", "gcp", "git"],
+  "machine-learning": ["python", "pandas", "tensorflow", "sql"],
+  cybersecurity: ["linux", "python", "docker", "git", "aws"],
+};
+
+const INTEREST_EMOJIS: Record<string, string> = {
+  "data-analytics": "📊",
+  frontend: "🎨",
+  backend: "🧱",
+  "cloud-devops": "☁️",
+  "machine-learning": "🤖",
+  cybersecurity: "🔐",
+};
 
 type Msg =
   | { role: "bot"; text: string; id: string }
   | { role: "user"; text: string; id: string };
 
+/**
+ * Los cinco primeros pasos los conduce el chatbot del backend (HU-29 a HU-31)
+ * y sus ids vienen en el campo `step` de la respuesta. Los siguientes son
+ * locales: todavía no existe un endpoint de onboarding para ellos.
+ */
 type Step =
-  | "name"
-  | "career"
-  | "cycle"
-  | "interests"
-  | "target"
+  | "loading"
+  | "ask_name"
+  | "ask_career"
+  | "ask_cycle"
+  | "ask_interests"
+  | "ask_target_role"
   | "skills"
   | "experience"
   | "learning"
@@ -77,113 +107,185 @@ type Step =
   | "confirm"
   | "done";
 
-const STEP_ORDER: Step[] = ["name", "career", "cycle", "interests", "target", "skills", "experience", "learning", "availability", "goal", "confirm", "done"];
+const STEP_ORDER: Step[] = [
+  "ask_name",
+  "ask_career",
+  "ask_cycle",
+  "ask_interests",
+  "ask_target_role",
+  "skills",
+  "experience",
+  "learning",
+  "availability",
+  "goal",
+  "confirm",
+  "done",
+];
+
+/** Vuelca el perfil que devuelve el backend sobre el borrador local. */
+function mergeBackendProfile(current: UserProfile, p: any): UserProfile {
+  if (!p) return current;
+
+  return {
+    ...current,
+    fullName: p.full_name ?? current.fullName,
+    email: p.email ?? current.email,
+    career: p.career ?? current.career,
+    university: p.university ?? current.university,
+    cycle: p.academic_cycle != null ? String(p.academic_cycle) : current.cycle,
+    // El chatbot marca al egresado escribiendo "Egresado" en experience_level.
+    isGraduated: p.experience_level === "Egresado",
+    interests: p.interests ?? current.interests,
+    targetRoleId: p.target_role_id ?? current.targetRoleId,
+    availabilityHours: p.weekly_hours ?? current.availabilityHours,
+    learningPreferences: p.learning_preferences ?? current.learningPreferences,
+    skills: p.skills?.length
+      ? p.skills.map((s: any) => ({ skillId: s.skill_slug, level: s.level as SkillLevel }))
+      : current.skills,
+    // `goal` no se hidrata desde professional_goal: tras la HU-31 ese campo
+    // guarda la etiqueta del rol objetivo, no la meta que escribe el usuario.
+  };
+}
 
 export default function OnboardingPage() {
   const { session, loading: authLoading } = useRequireAuth();
   const { profile, save, hydrated } = useProfile();
   const router = useRouter();
-  
+
   const [messages, setMessages] = useState<Msg[]>([]);
-  const [step, setStep] = useState<Step>("name");
+  const [step, setStep] = useState<Step>("loading");
   const [draft, setDraft] = useState<UserProfile>(defaultProfile);
+  const [options, setOptions] = useState<OnboardingOption[]>([]);
+  const [sending, setSending] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const started = useRef(false);
 
   const [skills, setSkills] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
+
+  const token = session?.access_token as string | undefined;
 
   useEffect(() => {
     if (!session) return;
     async function loadData() {
       try {
-        setLoadingData(true);
         const [skillsData, rolesData] = await Promise.all([
-          getCatalogSkills(),
-          getCatalogRoles()
+          getCatalogSkills().catch(() => []),
+          getCatalogRoles().catch(() => []),
         ]);
         setSkills(skillsData || []);
         setRoles(rolesData || []);
       } catch (err) {
         console.error("Error al cargar catálogos del onboarding:", err);
-      } finally {
-        setLoadingData(false);
       }
     }
     loadData();
   }, [session]);
 
   useEffect(() => {
-    if (session?.user && !profile?.fullName && session.user.user_metadata?.full_name) {
-      setDraft(d => ({ ...d, fullName: session.user.user_metadata.full_name }));
-    }
-  }, [session, profile]);
-
-  useEffect(() => {
     scrollerRef.current?.scrollTo({ top: scrollerRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, step]);
-
-  useEffect(() => {
-    if (!hydrated || started.current) return;
-    started.current = true;
-    const base = profile ?? defaultProfile;
-    setDraft({ ...base, onboardingComplete: false });
-    pushBot(`¡Hola! Soy SmartBot 🤖. Voy a hacerte algunas preguntas para armar tu ruta hacia el empleo tech. Toma unos 2 minutos.`);
-    setTimeout(() => pushBot("Primero, ¿cómo te llamas?"), 500);
-  }, [hydrated]);
 
   function pushBot(text: string) {
     setMessages((m) => [...m, { role: "bot", text, id: crypto.randomUUID() }]);
   }
 
-  function advance(next: Step) {
-    setStep(next);
+  function pushUser(text: string) {
+    setMessages((m) => [...m, { role: "user", text, id: crypto.randomUUID() }]);
   }
 
+  /** Pinta lo que respondió el chatbot y deja el formulario del paso que toca. */
+  const applyStep = useCallback((res: OnboardingStepResponse) => {
+    setDraft((d) => mergeBackendProfile(d, res.profile));
+    setOptions(res.options ?? []);
+    pushBot(res.message);
+    if (res.question) pushBot(res.question);
+
+    if (res.step === "completed") {
+      // El backend ya tiene todo lo suyo; seguimos con los pasos locales.
+      pushBot(
+        "Para afinar tu ruta, cuéntame qué nivel consideras tener en estas habilidades clave (1 principiante, 5 experto). Si no conoces una, déjala en 0."
+      );
+      setStep("skills");
+      return;
+    }
+
+    setStep(res.step);
+  }, []);
+
+  // Arranca (o retoma) la conversación con el backend.
+  useEffect(() => {
+    if (!hydrated || !token || started.current) return;
+    started.current = true;
+
+    async function bootstrap() {
+      setDraft({ ...(profile ?? defaultProfile), onboardingComplete: false });
+      try {
+        applyStep(await startOnboarding(token!));
+      } catch (err) {
+        console.error("Error al iniciar el onboarding:", err);
+        pushBot("No pude conectarme con SmartPath para iniciar tu onboarding. Revisa tu conexión y recarga la página.");
+        toast.error("No se pudo conectar con el servidor");
+        setStep("ask_name");
+      }
+    }
+    bootstrap();
+  }, [hydrated, token, profile, applyStep]);
+
+  /** Envía la respuesta del usuario al chatbot y aplica el paso resultante. */
+  async function runStep(userText: string, action: () => Promise<OnboardingStepResponse>) {
+    if (sending) return;
+    pushUser(userText);
+    setSending(true);
+    try {
+      applyStep(await action());
+    } catch (err) {
+      console.error("Error al guardar el paso del onboarding:", err);
+      // Mantenemos el paso actual para que pueda reintentar sin perder el hilo.
+      pushBot("No pude guardar tu respuesta. ¿Lo intentamos otra vez?");
+      toast.error("No se pudo guardar tu respuesta");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  // ---- Pasos conducidos por el backend (HU-29, HU-30, HU-31) ----
+
   function submitName(fullName: string) {
-    setMessages((m) => [...m, { role: "user", text: fullName, id: crypto.randomUUID() }]);
-    setDraft((d) => ({ ...d, fullName }));
-    pushBot(`Gusto en conocerte, **${fullName}**. ¿Qué carrera estudias en la universidad?`);
-    advance("career");
+    runStep(fullName, () => saveOnboardingName(token!, fullName));
   }
 
   function submitCareer(career: string) {
-    setMessages((m) => [...m, { role: "user", text: career, id: crypto.randomUUID() }]);
-    setDraft((d) => ({ ...d, career }));
-    pushBot(`¡Excelente carrera! ¿En qué ciclo académico te encuentras actualmente?`);
-    advance("cycle");
+    runStep(career, () => saveOnboardingCareer(token!, career));
   }
 
-  function submitCycle(cycle: string) {
-    setMessages((m) => [...m, { role: "user", text: `${cycle}° ciclo`, id: crypto.randomUUID() }]);
-    setDraft((d) => ({ ...d, cycle }));
-    pushBot(`¡Avanzando! Ahora selecciona los temas o tecnologías que más te llaman la atención para tu futuro profesional.`);
-    advance("interests");
+  function submitStage(value: string) {
+    if (value === "egresado") {
+      runStep("Ya egresé", () => saveOnboardingStage(token!, { isGraduated: true }));
+      return;
+    }
+    const cycle = Number(value);
+    runStep(`Ciclo ${cycle}`, () => saveOnboardingStage(token!, { academicCycle: cycle }));
   }
 
   function submitInterests(ids: string[]) {
-    setMessages((m) => [...m, { role: "user", text: `Me interesa: ${ids.map((id) => INTERESTS.find((i) => i.id === id)?.label).join(", ")}`, id: crypto.randomUUID() }]);
-    setDraft((d) => ({ ...d, interests: ids }));
-    pushBot(`¡Muy buenos intereses! De acuerdo a tus respuestas, ¿cuál es tu rol profesional objetivo?`);
-    advance("target");
+    const labels = ids.map((id) => options.find((o) => o.id === id)?.label ?? id).join(", ");
+    runStep(`Me interesa: ${labels}`, () => saveOnboardingInterests(token!, ids));
   }
 
   function submitTarget(id: string) {
-    const activeRoles = roles.length > 0 ? roles : DEFAULT_ROLES;
-    const role = activeRoles.find((r) => r.id === id) || activeRoles[0];
-    setMessages((m) => [...m, { role: "user", text: `Apunto a: ${role.label}`, id: crypto.randomUUID() }]);
-    setDraft((d) => ({ ...d, targetRoleId: id }));
-    pushBot(`Genial. Cuéntame ahora qué nivel consideras tener en estas habilidades clave para tu rol objetivo (1 principiante, 5 experto). Si no conoces una tecnología, déjala en 0.`);
-    advance("skills");
+    const label = options.find((o) => o.id === id)?.label ?? roles.find((r) => r.id === id)?.label ?? id;
+    runStep(`Apunto a: ${label}`, () => saveOnboardingTargetRole(token!, id));
   }
+
+  // ---- Pasos locales (sin endpoint propio todavía) ----
 
   function submitSkills(userSkills: { skillId: string; level: SkillLevel }[]) {
     const list = userSkills.filter((s) => s.level > 0);
-    setMessages((m) => [...m, { role: "user", text: `Calificadas ${list.length} skills`, id: crypto.randomUUID() }]);
+    pushUser(`Calificadas ${list.length} skills`);
     setDraft((d) => ({ ...d, skills: userSkills }));
-    pushBot(`¿Con qué tipo de experiencia o proyectos técnicos cuentas actualmente?`);
-    advance("experience");
+    pushBot("¿Con qué tipo de experiencia o proyectos técnicos cuentas actualmente?");
+    setStep("experience");
   }
 
   function submitExperience(experience: ExperienceKind[]) {
@@ -194,10 +296,10 @@ export default function OnboardingPage() {
       laboral: "Experiencia laboral",
       ninguna: "Aún no tengo experiencia",
     };
-    setMessages((m) => [...m, { role: "user", text: experience.map((e) => labels[e]).join(", "), id: crypto.randomUUID() }]);
+    pushUser(experience.map((e) => labels[e]).join(", "));
     setDraft((d) => ({ ...d, experience }));
-    pushBot(`¿Cómo prefieres consumir tu material de estudio para aprender una nueva tecnología?`);
-    advance("learning");
+    pushBot("¿Cómo prefieres consumir tu material de estudio para aprender una nueva tecnología?");
+    setStep("learning");
   }
 
   function submitLearning(learningPreferences: LearningPreference[]) {
@@ -207,34 +309,33 @@ export default function OnboardingPage() {
       practica: "Práctica hands-on",
       comunidad: "Comunidad/mentoría",
     };
-    setMessages((m) => [...m, { role: "user", text: learningPreferences.map((p) => labels[p]).join(", "), id: crypto.randomUUID() }]);
+    pushUser(learningPreferences.map((p) => labels[p]).join(", "));
     setDraft((d) => ({ ...d, learningPreferences }));
-    pushBot(`¿Cuántas horas a la semana puedes dedicarle a tu preparación y estudio técnico?`);
-    advance("availability");
+    pushBot("¿Cuántas horas a la semana puedes dedicarle a tu preparación y estudio técnico?");
+    setStep("availability");
   }
 
   function submitAvailability(availabilityHours: number) {
-    setMessages((m) => [...m, { role: "user", text: `${availabilityHours} horas semanales`, id: crypto.randomUUID() }]);
+    pushUser(`${availabilityHours} horas semanales`);
     setDraft((d) => ({ ...d, availabilityHours }));
-    pushBot(`Para finalizar, ¿cuál es tu principal meta a corto plazo? (Ej: conseguir mis primeras prácticas en una fintech).`);
-    advance("goal");
+    pushBot("Para finalizar, ¿cuál es tu principal meta a corto plazo? (Ej: conseguir mis primeras prácticas en una fintech).");
+    setStep("goal");
   }
 
-  async function submitGoal(goal: string) {
-    setMessages((m) => [...m, { role: "user", text: goal, id: crypto.randomUUID() }]);
-    const final = { ...draft, goal, onboardingComplete: true };
-    setDraft(final);
-    pushBot(`¡Todo listo! Revisa que tu información esté correcta para generar tu ruta personalizada.`);
-    advance("confirm");
+  function submitGoal(goal: string) {
+    pushUser(goal);
+    setDraft((d) => ({ ...d, goal, onboardingComplete: true }));
+    pushBot("¡Todo listo! Revisa que tu información esté correcta para generar tu ruta personalizada.");
+    setStep("confirm");
   }
 
   async function confirmAll() {
     const final = { ...draft, onboardingComplete: true };
     save(final);
 
-    if (session?.access_token) {
+    if (token) {
       try {
-        await upsertBackendProfile(session.access_token, final);
+        await upsertBackendProfile(token, final);
         toast.success("Perfil sincronizado con el backend");
       } catch (err) {
         console.error("Error al sincronizar perfil en onboarding:", err);
@@ -245,7 +346,7 @@ export default function OnboardingPage() {
     const activeRoles = roles.length > 0 ? roles : DEFAULT_ROLES;
     const role = activeRoles.find((r) => r.id === final.targetRoleId) || activeRoles[0];
     pushBot(`🎉 ¡Perfecto! Hemos completado tu ruta para **${role.label}**. Redirigiendo a tu dashboard...`);
-    advance("done");
+    setStep("done");
     toast.success(`Ruta lista para ${role.label}`);
     setTimeout(() => router.push("/dashboard"), 1600);
   }
@@ -258,7 +359,8 @@ export default function OnboardingPage() {
     );
   }
 
-  const progress = ((STEP_ORDER.indexOf(step) + 1) / (STEP_ORDER.length - 1)) * 100;
+  const stepIndex = STEP_ORDER.indexOf(step);
+  const progress = stepIndex < 0 ? 0 : ((stepIndex + 1) / (STEP_ORDER.length - 1)) * 100;
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col px-4 py-6 md:py-10">
@@ -289,6 +391,12 @@ export default function OnboardingPage() {
           {messages.map((m) => (
             <MessageBubble key={m.id} m={m} />
           ))}
+          {sending && (
+            <div className="flex items-center gap-2 pl-9 text-xs text-on-surface-variant">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              SmartBot está escribiendo...
+            </div>
+          )}
         </div>
 
         {/* Input area */}
@@ -296,11 +404,13 @@ export default function OnboardingPage() {
           <StepInput
             step={step}
             draft={draft}
+            options={options}
             roles={roles}
             skills={skills}
+            disabled={sending}
             onName={submitName}
             onCareer={submitCareer}
-            onCycle={submitCycle}
+            onStage={submitStage}
             onInterests={submitInterests}
             onTarget={submitTarget}
             onSkills={submitSkills}
@@ -347,11 +457,13 @@ function MessageBubble({ m }: { m: Msg }) {
 interface StepInputProps {
   step: Step;
   draft: UserProfile;
+  options: OnboardingOption[];
   roles: any[];
   skills: any[];
+  disabled: boolean;
   onName: (v: string) => void;
   onCareer: (v: string) => void;
-  onCycle: (v: string) => void;
+  onStage: (v: string) => void;
   onInterests: (ids: string[]) => void;
   onTarget: (id: string) => void;
   onSkills: (l: { skillId: string; level: SkillLevel }[]) => void;
@@ -364,57 +476,40 @@ interface StepInputProps {
 
 function StepInput(p: StepInputProps) {
   switch (p.step) {
-    case "name":
+    case "loading":
+      return (
+        <div className="flex items-center justify-center gap-2 text-sm text-on-surface-variant">
+          <Loader2 className="h-4 w-4 animate-spin" /> Conectando con SmartBot...
+        </div>
+      );
+    case "ask_name":
       return (
         <TextComposer
           placeholder="Tu nombre completo"
           defaultValue={p.draft.fullName}
+          disabled={p.disabled}
           onSubmit={p.onName}
         />
       );
-    case "career":
+    case "ask_career":
       return (
         <TextComposer
           placeholder="Ej: Ingeniería de Sistemas, Ciencia de la Computación"
           defaultValue={p.draft.career}
+          disabled={p.disabled}
           onSubmit={p.onCareer}
         />
       );
-    case "cycle":
-      return (
-        <ChipRow
-          options={[
-            { id: "7", label: "7° ciclo" },
-            { id: "8", label: "8° ciclo" },
-            { id: "9", label: "9° ciclo" },
-            { id: "10", label: "10° ciclo" },
-            { id: "egresado", label: "Egresado" },
-          ]}
-          onSelect={p.onCycle}
-        />
-      );
-    case "interests":
-      return (
-        <MultiChip
-          options={INTERESTS.map((i) => ({ id: i.id, label: `${i.emoji} ${i.label}` }))}
-          initial={p.draft.interests}
-          onSubmit={p.onInterests}
-        />
-      );
-    case "target": {
-      const activeRoles = p.roles && p.roles.length > 0 ? p.roles : DEFAULT_ROLES;
-      return (
-        <TargetRolePicker
-          activeRoles={activeRoles}
-          draftInterests={p.draft.interests}
-          onTarget={p.onTarget}
-        />
-      );
-    }
+    case "ask_cycle":
+      return <CyclePicker disabled={p.disabled} onSelect={p.onStage} />;
+    case "ask_interests":
+      return <InterestPicker options={p.options} initial={p.draft.interests} disabled={p.disabled} onSubmit={p.onInterests} />;
+    case "ask_target_role":
+      return <TargetRolePicker suggestions={p.options} allRoles={p.roles} disabled={p.disabled} onTarget={p.onTarget} />;
     case "skills": {
       const activeRoles = p.roles && p.roles.length > 0 ? p.roles : DEFAULT_ROLES;
       const interestSkills = new Set<string>();
-      p.draft.interests.forEach((iid) => INTERESTS.find((i) => i.id === iid)?.skills.forEach((s) => interestSkills.add(s)));
+      p.draft.interests.forEach((id) => INTEREST_SKILL_HINTS[id]?.forEach((s) => interestSkills.add(s)));
       const role = activeRoles.find((r) => r.id === p.draft.targetRoleId);
       if (role && (role.core_skill_slugs || role.coreSkills)) {
         const slugs = role.core_skill_slugs || role.coreSkills;
@@ -466,29 +561,126 @@ function StepInput(p: StepInputProps) {
   }
 }
 
+/** HU-29: el backend acepta ciclos de 1 a 12, o la marca de egresado. */
+function CyclePicker({ disabled, onSelect }: { disabled: boolean; onSelect: (v: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {Array.from({ length: 12 }, (_, i) => i + 1).map((c) => (
+        <button
+          key={c}
+          type="button"
+          disabled={disabled}
+          onClick={() => onSelect(String(c))}
+          className="h-9 w-11 rounded-full border border-outline-variant bg-white text-sm font-medium text-on-surface transition hover:border-primary hover:bg-primary/5 disabled:opacity-50"
+        >
+          {c}°
+        </button>
+      ))}
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onSelect("egresado")}
+        className="h-9 rounded-full border border-outline-variant bg-white px-4 text-sm font-medium text-on-surface transition hover:border-primary hover:bg-primary/5 disabled:opacity-50"
+      >
+        🎓 Ya egresé
+      </button>
+    </div>
+  );
+}
+
+/** HU-30: áreas de tecnología servidas por el backend. */
+function InterestPicker({
+  options,
+  initial,
+  disabled,
+  onSubmit,
+}: {
+  options: OnboardingOption[];
+  initial: string[];
+  disabled: boolean;
+  onSubmit: (ids: string[]) => void;
+}) {
+  const [selected, setSelected] = useState<string[]>(initial);
+  const [areas, setAreas] = useState<OnboardingOption[]>(options);
+
+  // Red de seguridad: si el paso llegó sin opciones, las pedimos al catálogo.
+  useEffect(() => {
+    if (options.length > 0) {
+      setAreas(options);
+      return;
+    }
+    getOnboardingInterestAreas()
+      .then(setAreas)
+      .catch((err) => console.error("Error al cargar las áreas de interés:", err));
+  }, [options]);
+
+  function toggle(id: string) {
+    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  }
+
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap gap-2">
+        {areas.map((a) => {
+          const active = selected.includes(a.id);
+          return (
+            <button
+              key={a.id}
+              type="button"
+              title={a.description}
+              onClick={() => toggle(a.id)}
+              className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
+                active ? "border-primary bg-primary text-white" : "border-outline-variant bg-white text-on-surface hover:border-primary"
+              }`}
+            >
+              {INTEREST_EMOJIS[a.id] ? `${INTEREST_EMOJIS[a.id]} ` : ""}
+              {a.label}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex justify-end">
+        <Button
+          onClick={() => onSubmit(selected)}
+          disabled={disabled || selected.length === 0}
+          className="gradient-brand text-white hover:opacity-90"
+        >
+          Continuar
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * HU-31: muestra las líneas de carrera que sugirió el backend según los
+ * intereses, con la opción de ver el catálogo completo de role_targets.
+ */
 function TargetRolePicker({
-  activeRoles,
-  draftInterests,
+  suggestions,
+  allRoles,
+  disabled,
   onTarget,
 }: {
-  activeRoles: any[];
-  draftInterests: string[];
+  suggestions: OnboardingOption[];
+  allRoles: any[];
+  disabled: boolean;
   onTarget: (id: string) => void;
 }) {
   const [showAll, setShowAll] = useState(false);
-  const suggestedIds = new Set<string>();
-  draftInterests.forEach((iid) => INTERESTS.find((i) => i.id === iid)?.roles.forEach((r) => suggestedIds.add(r)));
-  const suggestedRoles = activeRoles.filter((r) => suggestedIds.has(r.id));
-  const hasMore = suggestedRoles.length > 0 && suggestedRoles.length < activeRoles.length;
-  const list = showAll || !suggestedRoles.length ? activeRoles : suggestedRoles;
+  const catalog = allRoles && allRoles.length > 0 ? allRoles : DEFAULT_ROLES;
+  const list = showAll || suggestions.length === 0 ? catalog : suggestions;
+  const hasMore = suggestions.length > 0 && suggestions.length < catalog.length;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {list.map((r) => (
+      {list.map((r: any) => (
         <button
           key={r.id}
+          type="button"
+          disabled={disabled}
           onClick={() => onTarget(r.id)}
-          className="rounded-full border border-outline-variant bg-white px-4 py-2 text-sm font-medium transition hover:border-primary hover:bg-primary/5 text-on-surface"
+          className="rounded-full border border-outline-variant bg-white px-4 py-2 text-sm font-medium transition hover:border-primary hover:bg-primary/5 text-on-surface disabled:opacity-50"
         >
           {r.label}
         </button>
@@ -499,36 +691,38 @@ function TargetRolePicker({
           onClick={() => setShowAll(true)}
           className="rounded-full border border-dashed border-primary/60 bg-primary/5 px-4 py-2 text-xs font-semibold text-primary transition hover:bg-primary/10"
         >
-          🔍 Ver otros roles ({activeRoles.length - suggestedRoles.length} más)
+          🔍 Ver otros roles ({catalog.length - suggestions.length} más)
         </button>
       )}
     </div>
   );
 }
 
-function TextComposer({ placeholder, defaultValue, onSubmit }: { placeholder: string; defaultValue?: string; onSubmit: (v: string) => void }) {
+function TextComposer({
+  placeholder,
+  defaultValue,
+  disabled,
+  onSubmit,
+}: {
+  placeholder: string;
+  defaultValue?: string;
+  disabled?: boolean;
+  onSubmit: (v: string) => void;
+}) {
   const [v, setV] = useState(defaultValue || "");
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSubmit(v); setV(""); }} className="flex gap-2">
-      <Input value={v} onChange={(e) => setV(e.target.value)} placeholder={placeholder} autoFocus className="flex-1 bg-white" />
-      <Button type="submit" className="gradient-brand text-white hover:opacity-90">Enviar</Button>
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!v.trim()) return;
+        onSubmit(v.trim());
+        setV("");
+      }}
+      className="flex gap-2"
+    >
+      <Input value={v} onChange={(e) => setV(e.target.value)} placeholder={placeholder} autoFocus disabled={disabled} className="flex-1 bg-white" />
+      <Button type="submit" disabled={disabled} className="gradient-brand text-white hover:opacity-90">Enviar</Button>
     </form>
-  );
-}
-
-function ChipRow({ options, onSelect }: { options: { id: string; label: string }[]; onSelect: (id: string) => void }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((o) => (
-        <button
-          key={o.id}
-          onClick={() => onSelect(o.id)}
-          className="rounded-full border border-outline-variant bg-white px-4 py-2 text-sm font-medium transition hover:border-primary hover:bg-primary/5 text-on-surface"
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
   );
 }
 
@@ -672,6 +866,7 @@ function AvailabilityPicker({ initial, onSubmit }: { initial: number; onSubmit: 
 function ConfirmPanel({ draft, onConfirm, roles }: { draft: UserProfile; onConfirm: () => void; roles: any[] }) {
   const activeRoles = roles && roles.length > 0 ? roles : DEFAULT_ROLES;
   const role = activeRoles.find((r) => r.id === draft.targetRoleId);
+  const stage = draft.isGraduated ? "Egresado" : `${draft.cycle}° ciclo`;
   return (
     <div className="space-y-2 text-sm text-on-surface">
       <div className="grid gap-1.5 rounded-lg border border-outline-variant bg-white p-3">
@@ -681,7 +876,7 @@ function ConfirmPanel({ draft, onConfirm, roles }: { draft: UserProfile; onConfi
         </div>
         <div className="flex items-start justify-between gap-3">
           <span className="shrink-0 text-xs uppercase tracking-wider text-on-surface-variant">Carrera</span>
-          <span className="text-right text-sm font-medium">{`${draft.career} · ${draft.cycle}° ciclo`}</span>
+          <span className="text-right text-sm font-medium">{`${draft.career} · ${stage}`}</span>
         </div>
         <div className="flex items-start justify-between gap-3">
           <span className="shrink-0 text-xs uppercase tracking-wider text-on-surface-variant">Objetivo</span>

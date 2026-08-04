@@ -18,6 +18,7 @@ import {
   getCatalogJobs,
   getCatalogSkills,
   getCatalogRoles,
+  isOnboardingComplete,
 } from "@/services/api";
 import { loadProfile, type UserProfile } from "@/lib/profile-store";
 
@@ -63,6 +64,7 @@ export default function DashboardPage() {
   
   const [gap, setGap] = useState<any>(null);
   const [roadmap, setRoadmap] = useState<any>(null);
+  const [analysisFailed, setAnalysisFailed] = useState(false);
   const [jobs, setJobs] = useState<any[]>([]);
   const [skills, setSkills] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
@@ -127,8 +129,8 @@ const DEFAULT_SKILLS = [
           }
         }
 
-        if (!profileData) {
-          // Si continúa sin existir perfil en el backend, redirigir a Onboarding
+        if (!isOnboardingComplete(profileData)) {
+          // Sin perfil, o con el onboarding del chatbot a medias: lo retomamos.
           router.push("/onboarding");
           return;
         }
@@ -139,11 +141,14 @@ const DEFAULT_SKILLS = [
           university: profileData.university || "",
           career: profileData.career || "",
           cycle: profileData.academic_cycle ? String(profileData.academic_cycle) : "9",
+          isGraduated: profileData.experience_level === "Egresado",
           availabilityHours: profileData.weekly_hours || 10,
           goal: profileData.professional_goal || "",
           targetRoleId: profileData.target_role_id || "fullstack",
           interests: profileData.interests || [],
-          experience: profileData.experience_level ? profileData.experience_level.split(", ") : [],
+          // experience_level guarda la etapa académica de la HU-29; los tipos de
+          // experiencia siguen viviendo solo en el perfil local.
+          experience: loadProfile()?.experience ?? [],
           learningPreferences: profileData.learning_preferences || [],
           languages: profileData.english_level ? profileData.english_level.split(", ") : ["Español"],
           certifications: [],
@@ -161,28 +166,13 @@ const DEFAULT_SKILLS = [
           setGap(gapData);
           setRoadmap(roadmapData);
         } catch (gapErr) {
-          console.warn("Usando brecha y roadmap iniciales por defecto:", gapErr);
-          setGap({
-            readiness_percentage: 65,
-            matching_skills: [
-              { skill_slug: "javascript", skill_name: "JavaScript", user_level: 3, required_level: 3 },
-              { skill_slug: "react", skill_name: "React", user_level: 3, required_level: 4 }
-            ],
-            missing_skills: [
-              { skill_slug: "typescript", skill_name: "TypeScript", current_level: 1, target_level: 3, market_demand_percentage: 85 }
-            ],
-            market_summary: { total_jobs_analyzed: 45, top_skills: ["react", "typescript", "nodejs"] }
-          });
-          setRoadmap([
-            {
-              level: 1,
-              title: "Fundamentos Esenciales",
-              description: "Fortalece las bases requeridas para tu rol objetivo.",
-              estimated_weeks: 3,
-              skills_to_master: ["typescript", "nodejs"],
-              recommended_courses: []
-            }
-          ]);
+          console.warn("No se pudieron cargar brecha y roadmap:", gapErr);
+          // El fallback debe respetar el contrato del backend
+          // (GapAnalysisResponse y List[RoadmapLevel]); si no, el render
+          // revienta al leer gap.coverage o level.skills.
+          setGap({ target_role: null, mastered: [], partial: [], missing: [], coverage: 0 });
+          setRoadmap([]);
+          setAnalysisFailed(true);
         }
       } catch (err: any) {
         console.error("Error al conectar con el backend:", err);
@@ -229,12 +219,28 @@ const DEFAULT_SKILLS = [
 
   const target = roles.find((r) => r.id === profile.targetRoleId) ?? roles[0];
   const market = computeMarketSkillFrequency(jobs, skills);
-  const totalHours = roadmap.reduce((acc: number, l: any) => acc + l.skills.reduce((a: number, s: any) => a + s.estHours, 0), 0);
-  const progressPct = Math.round(gap.coverage * 100);
+  // roadmap y gap pueden seguir en null si la carga se cortó antes del catch.
+  const levels: any[] = Array.isArray(roadmap) ? roadmap : [];
+  const totalHours = levels.reduce(
+    (acc: number, l: any) => acc + (l.skills ?? []).reduce((a: number, s: any) => a + (s.estHours ?? 0), 0),
+    0
+  );
+  const coverage = gap?.coverage ?? 0;
+  const mastered: any[] = gap?.mastered ?? [];
+  const partial: any[] = gap?.partial ?? [];
+  const missing: any[] = gap?.missing ?? [];
+  const progressPct = Math.round(coverage * 100);
   const quote = pickQuote(profile.fullName || "", progressPct);
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">
+      {analysisFailed && (
+        <div className="mb-6 rounded-2xl border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-900">
+          No pudimos calcular tu brecha de habilidades ni tu roadmap. Los indicadores de abajo están en cero
+          hasta que el análisis vuelva a responder.
+        </div>
+      )}
+
       {/* FastAPI Safe Connection status Header */}
       <div className="mb-6 flex items-center justify-between rounded-2xl border border-outline-variant bg-white p-4 shadow-xs">
         <div className="flex items-center gap-3">
@@ -299,8 +305,8 @@ const DEFAULT_SKILLS = [
 
       {/* Stat cards */}
       <div className="grid gap-4 md:grid-cols-4">
-        <StatCard label="Cobertura del rol" value={`${Math.round(gap.coverage * 100)}%`} hint={`${gap.mastered.length}/${target.core_skill_slugs?.length ?? target.coreSkills?.length ?? 0} skills clave dominadas`} />
-        <StatCard label="Skills por aprender" value={String(gap.missing.length)} hint="Priorizadas por demanda" />
+        <StatCard label="Cobertura del rol" value={`${progressPct}%`} hint={`${mastered.length}/${target.core_skill_slugs?.length ?? target.coreSkills?.length ?? 0} skills clave dominadas`} />
+        <StatCard label="Skills por aprender" value={String(missing.length)} hint="Priorizadas por demanda" />
         <StatCard label="Horas estimadas" value={`${totalHours}h`} hint="Roadmap completo" />
         <StatCard label="Ofertas analizadas" value={String(jobs.length)} hint="Mercado peruano" />
       </div>
@@ -309,13 +315,13 @@ const DEFAULT_SKILLS = [
       <section className="surface-card mt-6 p-6">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-display text-lg font-semibold text-on-surface">Tu preparación para {target.label}</h2>
-          <span className="text-sm text-on-surface-variant">{Math.round(gap.coverage * 100)}%</span>
+          <span className="text-sm text-on-surface-variant">{progressPct}%</span>
         </div>
-        <Progress value={gap.coverage * 100} className="h-3" />
+        <Progress value={coverage * 100} className="h-3" />
         <div className="mt-4 flex flex-wrap gap-2 text-xs">
-          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">✓ {gap.mastered.length} dominadas</Badge>
-          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">◐ {gap.partial.length} en progreso</Badge>
-          <Badge variant="destructive">◯ {gap.missing.length} por aprender</Badge>
+          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">✓ {mastered.length} dominadas</Badge>
+          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">◐ {partial.length} en progreso</Badge>
+          <Badge variant="destructive">◯ {missing.length} por aprender</Badge>
         </div>
       </section>
 
@@ -353,7 +359,7 @@ const DEFAULT_SKILLS = [
           <h2 className="font-display text-lg font-semibold text-on-surface">Próximos pasos</h2>
           <p className="mt-1 text-sm text-on-surface-variant">Empieza por lo más rentable.</p>
           <ol className="mt-4 space-y-3">
-            {gap.missing.slice(0, 5).map((m: any, i: number) => {
+            {missing.slice(0, 5).map((m: any, i: number) => {
               const slug = m.skill_slug || m.skillId;
               return (
                 <li key={slug || i} className="flex items-start gap-3 rounded-lg border border-outline-variant p-3">
@@ -372,7 +378,7 @@ const DEFAULT_SKILLS = [
                 </li>
               );
             })}
-            {gap.missing.length === 0 && (
+            {missing.length === 0 && (
               <li className="rounded-lg border border-outline-variant p-4 text-sm text-on-surface-variant">
                 🎉 Dominas todas las skills clave del rol. Explora los <Link href="/cursos" className="text-primary hover:underline">cursos avanzados</Link>.
               </li>

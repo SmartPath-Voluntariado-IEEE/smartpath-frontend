@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import { getBackendProfile } from '@/services/api';
+import { getBackendProfile, isOnboardingComplete } from '@/services/api';
 import { Loader2 } from 'lucide-react';
 
 export default function AuthCallback() {
@@ -32,7 +32,9 @@ export default function AuthCallback() {
             profile = await getBackendProfile(session.access_token);
           }
 
-          if (profile) {
+          // El chatbot crea la fila del perfil en el primer paso, así que
+          // "existe perfil" no basta: hay que mirar si el onboarding terminó.
+          if (isOnboardingComplete(profile)) {
             router.push('/dashboard');
           } else {
             router.push('/onboarding');

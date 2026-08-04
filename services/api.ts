@@ -46,22 +46,35 @@ export async function getBackendProfile(token: string): Promise<any> {
 }
 
 export async function upsertBackendProfile(token: string, profile: UserProfile): Promise<any> {
-  let academicCycleNum = 10;
-  if (profile.cycle) {
+  // El backend acepta ciclos de 1 a 12 y deja academic_cycle en null si el
+  // usuario ya egresó. No mandamos un ciclo inventado: el upsert ignora los
+  // campos ausentes, así que omitirlo conserva lo que guardó el chatbot.
+  let academicCycle: number | undefined;
+  if (!profile.isGraduated && profile.cycle) {
     const match = profile.cycle.match(/\d+/);
     if (match) {
-      academicCycleNum = parseInt(match[0], 10);
+      const parsed = parseInt(match[0], 10);
+      if (parsed >= 1 && parsed <= 12) academicCycle = parsed;
     }
   }
+
+  // experience_level es la etapa académica de la HU-29 ("Egresado" / "Ciclo N"),
+  // que es de donde el chatbot deduce si ya respondió ese paso. Los tipos de
+  // experiencia del formulario largo viven solo en el perfil local.
+  const academicStage = profile.isGraduated
+    ? "Egresado"
+    : academicCycle
+      ? `Ciclo ${academicCycle}`
+      : undefined;
 
   const payload = {
     full_name: profile.fullName || undefined,
     career: profile.career || undefined,
-    academic_cycle: academicCycleNum,
+    academic_cycle: academicCycle,
     target_role_id: profile.targetRoleId || undefined,
     weekly_hours: profile.availabilityHours || 10,
     professional_goal: profile.goal || undefined,
-    experience_level: Array.isArray(profile.experience) ? profile.experience.join(", ") : (profile.experience || undefined),
+    experience_level: academicStage,
     interests: profile.interests || [],
     learning_preferences: profile.learningPreferences || [],
     skills: (profile.skills || [])
@@ -74,6 +87,92 @@ export async function upsertBackendProfile(token: string, profile: UserProfile):
 
   const response = await api.post("/users/profile", payload, getAuthHeader(token));
   return response.data;
+}
+
+// ============================================
+// CHATBOT DE ONBOARDING (HU-29, HU-30, HU-31)
+// ============================================
+
+export type OnboardingStepName =
+  | "ask_name"
+  | "ask_career"
+  | "ask_cycle"
+  | "ask_interests"
+  | "ask_target_role"
+  | "completed";
+
+export interface OnboardingOption {
+  id: string;
+  label: string;
+  description?: string;
+  core_skill_slugs?: string[];
+  match_score?: number;
+}
+
+/** Respuesta uniforme de todos los pasos del chatbot (OnboardingStepResponse). */
+export interface OnboardingStepResponse {
+  step: OnboardingStepName;
+  message: string;
+  question: string | null;
+  options: OnboardingOption[];
+  profile: any | null;
+}
+
+/** HU-29: saluda y devuelve la primera pregunta pendiente (retoma si ya avanzó). */
+export async function startOnboarding(token: string): Promise<OnboardingStepResponse> {
+  const response = await api.get("/onboarding/start", getAuthHeader(token));
+  return response.data;
+}
+
+/** HU-29: guarda el nombre con el que el usuario quiere ser llamado. */
+export async function saveOnboardingName(token: string, fullName: string): Promise<OnboardingStepResponse> {
+  const response = await api.post("/onboarding/name", { full_name: fullName }, getAuthHeader(token));
+  return response.data;
+}
+
+/** HU-29: guarda la carrera que estudia o estudió. */
+export async function saveOnboardingCareer(token: string, career: string): Promise<OnboardingStepResponse> {
+  const response = await api.post("/onboarding/career", { career }, getAuthHeader(token));
+  return response.data;
+}
+
+/** HU-29: guarda el ciclo académico (1-12) o marca al usuario como egresado. */
+export async function saveOnboardingStage(
+  token: string,
+  stage: { academicCycle?: number; isGraduated?: boolean }
+): Promise<OnboardingStepResponse> {
+  const payload = {
+    academic_cycle: stage.isGraduated ? null : stage.academicCycle ?? null,
+    is_graduated: stage.isGraduated ?? false,
+  };
+  const response = await api.post("/onboarding/stage", payload, getAuthHeader(token));
+  return response.data;
+}
+
+/** HU-30: áreas de tecnología disponibles. Endpoint público, no requiere token. */
+export async function getOnboardingInterestAreas(): Promise<OnboardingOption[]> {
+  const response = await api.get("/onboarding/interest-areas");
+  return response.data;
+}
+
+/** HU-30: guarda las áreas elegidas y devuelve las líneas de carrera sugeridas. */
+export async function saveOnboardingInterests(token: string, interestIds: string[]): Promise<OnboardingStepResponse> {
+  const response = await api.post("/onboarding/interests", { interest_ids: interestIds }, getAuthHeader(token));
+  return response.data;
+}
+
+/** HU-31: guarda el rol objetivo elegido y cierra el onboarding conversacional. */
+export async function saveOnboardingTargetRole(token: string, targetRoleId: string): Promise<OnboardingStepResponse> {
+  const response = await api.post("/onboarding/target-role", { target_role_id: targetRoleId }, getAuthHeader(token));
+  return response.data;
+}
+
+/**
+ * El onboarding conversacional termina cuando hay rol objetivo: es el último dato
+ * que pide el chatbot y del que dependen el gap-analysis y el roadmap.
+ */
+export function isOnboardingComplete(profile: any): boolean {
+  return Boolean(profile?.target_role_id);
 }
 
 export async function getCatalogSkills(): Promise<any> {
