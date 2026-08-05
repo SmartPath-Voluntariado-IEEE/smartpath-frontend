@@ -9,6 +9,7 @@ export interface UserProfile {
   university: string;
   career: string;
   cycle: string; // "8", "9", "10"
+  isGraduated: boolean; // HU-29: el usuario ya egresó, no cursa un ciclo
   availabilityHours: number; // weekly_hours
   goal: string; // professional_goal
   targetMonths?: number; // HU3: meta profesional en meses (3, 6, 12)
@@ -33,6 +34,7 @@ export const defaultProfile: UserProfile = {
   university: "",
   career: "Ingeniería de Sistemas",
   cycle: "9",
+  isGraduated: false,
   targetRoleId: "fullstack",
   interests: [],
   experience: [],

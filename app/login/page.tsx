@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import { supabase } from "@/lib/supabaseClient";
-import { getBackendProfile } from "@/services/api";
+import { getBackendProfile, isOnboardingComplete } from "@/services/api";
 import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
@@ -19,13 +19,9 @@ export default function LoginPage() {
           try {
             localStorage.setItem("access_token", session.access_token);
             const profile = await getBackendProfile(session.access_token);
-            if (profile) {
-              router.push("/dashboard");
-              return;
-            } else {
-              router.push("/onboarding");
-              return;
-            }
+            // Si el chatbot dejó el perfil a medias, retomamos el onboarding.
+            router.push(isOnboardingComplete(profile) ? "/dashboard" : "/onboarding");
+            return;
           } catch (profileErr) {
             console.log("Sesión previa expirada o no válida en backend:", profileErr);
             localStorage.removeItem("access_token");
