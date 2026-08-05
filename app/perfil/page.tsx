@@ -164,6 +164,90 @@ export default function ProfilePage() {
           </div>
         </section>
 
+        {/* Sección HU1, HU2 y HU3 */}
+        <section className="surface-card p-6 bg-white space-y-6">
+          <div>
+            <h2 className="font-display text-lg font-semibold text-on-surface">Preferencia de Estudio y Disponibilidad</h2>
+            <p className="mt-1 text-sm text-on-surface-variant">Ajusta tu ritmo de aprendizaje y el formato en el que prefieres estudiar.</p>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <Field label="Horas disponibles por semana (HU2)">
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min={2}
+                  max={40}
+                  step={1}
+                  value={form.availabilityHours || 10}
+                  onChange={(e) => update("availabilityHours", Number(e.target.value))}
+                  className="flex-1 accent-primary cursor-pointer"
+                />
+                <span className="shrink-0 rounded-lg bg-primary/10 px-3 py-1 text-sm font-bold text-primary">
+                  {form.availabilityHours || 10}h / semana
+                </span>
+              </div>
+            </Field>
+
+            <Field label="Plazo objetivo para tu meta (HU3)">
+              <Select
+                value={String(form.targetMonths || 6)}
+                onValueChange={(v) => update("targetMonths", Number(v))}
+              >
+                <SelectTrigger className="bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="3">3 meses (Intensivo)</SelectItem>
+                  <SelectItem value="6">6 meses (Recomendado)</SelectItem>
+                  <SelectItem value="12">12 meses (Flexible)</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+
+          <Field label="Meta profesional corta">
+            <Input
+              value={form.goal || ""}
+              onChange={(e) => update("goal", e.target.value)}
+              placeholder="Ej: Conseguir mis primeras prácticas pre-profesionales"
+            />
+          </Field>
+
+          <Field label="Formatos de aprendizaje preferidos (HU1)">
+            <div className="flex flex-wrap gap-2 pt-1">
+              {[
+                { id: "video", label: "📺 Videos / clases" },
+                { id: "lectura", label: "📖 Lectura / docs" },
+                { id: "practica", label: "🛠️ Práctica hands-on" },
+                { id: "comunidad", label: "👥 Comunidad / mentoría" },
+              ].map((fmt) => {
+                const active = (form.learningPreferences || []).includes(fmt.id as any);
+                return (
+                  <button
+                    type="button"
+                    key={fmt.id}
+                    onClick={() => {
+                      const current = form.learningPreferences || [];
+                      const updated = active
+                        ? current.filter((x) => x !== fmt.id)
+                        : [...current, fmt.id as any];
+                      update("learningPreferences", updated);
+                    }}
+                    className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
+                      active
+                        ? "border-primary bg-primary text-white"
+                        : "border-outline-variant bg-white text-on-surface hover:border-primary"
+                    }`}
+                  >
+                    {fmt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+        </section>
+
         <section className="surface-card p-6 bg-white">
           <div className="flex items-center justify-between">
             <div>

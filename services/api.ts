@@ -72,11 +72,12 @@ export async function upsertBackendProfile(token: string, profile: UserProfile):
     career: profile.career || undefined,
     academic_cycle: academicCycle,
     target_role_id: profile.targetRoleId || undefined,
-    weekly_hours: profile.availabilityHours || 10,
-    professional_goal: profile.goal || undefined,
-    experience_level: academicStage,
+    weekly_hours: profile.availabilityHours || 10, // HU2: Horas por semana disponibles
+    target_months: profile.targetMonths || 6, // HU3: Plazo objetivo en meses
+    professional_goal: profile.goal || undefined, // HU3: Meta profesional
+    experience_level: Array.isArray(profile.experience) ? profile.experience.join(", ") : (profile.experience || undefined),
     interests: profile.interests || [],
-    learning_preferences: profile.learningPreferences || [],
+    learning_preferences: profile.learningPreferences || [], // HU1: Formatos de aprendizaje preferidos
     skills: (profile.skills || [])
       .filter((s) => s.level > 0)
       .map((s) => ({

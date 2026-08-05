@@ -169,25 +169,38 @@ function CoursesContent() {
 
       {!loading && !error && courses.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {courses.map((c, i) => (
-            <div key={i} className="surface-card flex flex-col p-5 bg-white">
-              <div className="flex items-start justify-between gap-2 text-on-surface">
-                <Badge variant="secondary">{c.platform}</Badge>
-                <span className="text-sm">⭐ {c.rating}</span>
+          {/* Cursos priorizados por el backend según learning_preferences (HU1) y disponibilidad (HU2) */}
+          {courses.map((c, i) => {
+            const matchesPref = profile?.learningPreferences?.some(
+              (p) => c.style?.toLowerCase().includes(p.toLowerCase()) || (p === "video" && c.style?.toLowerCase().includes("video"))
+            );
+            return (
+              <div key={i} className="surface-card flex flex-col p-5 bg-white relative">
+                <div className="flex items-start justify-between gap-2 text-on-surface">
+                  <Badge variant="secondary">{c.platform}</Badge>
+                  <span className="text-sm font-semibold text-amber-500">⭐ {c.rating}</span>
+                </div>
+                {matchesPref && (
+                  <div className="mt-2">
+                    <Badge className="bg-primary/10 text-primary border-primary/20 text-[11px]">
+                      🎯 Coincide con tu formato preferido
+                    </Badge>
+                  </div>
+                )}
+                <h3 className="mt-3 font-display text-lg font-semibold leading-snug text-on-surface">{c.title}</h3>
+                <p className="mt-2 text-sm text-on-surface-variant italic">"{c.why}"</p>
+                <div className="mt-4 grid grid-cols-2 gap-2 text-center text-xs text-on-surface-variant">
+                  <div><div className="font-semibold text-on-surface">{c.hours}h</div>Duración</div>
+                  <div><div className="font-semibold text-on-surface">{c.level}</div>Nivel</div>
+                  <div><div className="font-semibold text-on-surface">{c.price}</div>Precio</div>
+                  <div><div className="font-semibold text-on-surface capitalize">{c.style}</div>Estilo</div>
+                </div>
+                <Button variant="outline" className="mt-5 w-full border-outline-variant text-on-surface" onClick={() => window.open(c.url, "_blank", "noreferrer,noopener")}>
+                  Ver curso
+                </Button>
               </div>
-              <h3 className="mt-3 font-display text-lg font-semibold leading-snug text-on-surface">{c.title}</h3>
-              <p className="mt-2 text-sm text-on-surface-variant italic">"{c.why}"</p>
-              <div className="mt-4 grid grid-cols-2 gap-2 text-center text-xs text-on-surface-variant">
-                <div><div className="font-semibold text-on-surface">{c.hours}h</div>Duración</div>
-                <div><div className="font-semibold text-on-surface">{c.level}</div>Nivel</div>
-                <div><div className="font-semibold text-on-surface">{c.price}</div>Precio</div>
-                <div><div className="font-semibold text-on-surface capitalize">{c.style}</div>Estilo</div>
-              </div>
-              <Button variant="outline" className="mt-5 w-full border-outline-variant text-on-surface" onClick={() => window.open(c.url, "_blank", "noreferrer,noopener")}>
-                Ver curso
-              </Button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

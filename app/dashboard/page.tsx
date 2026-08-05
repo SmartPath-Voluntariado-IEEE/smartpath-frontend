@@ -144,6 +144,7 @@ const DEFAULT_SKILLS = [
           isGraduated: profileData.experience_level === "Egresado",
           availabilityHours: profileData.weekly_hours || 10,
           goal: profileData.professional_goal || "",
+          targetMonths: profileData.target_months || 6,
           targetRoleId: profileData.target_role_id || "fullstack",
           interests: profileData.interests || [],
           // experience_level guarda la etapa académica de la HU-29; los tipos de
@@ -234,32 +235,6 @@ const DEFAULT_SKILLS = [
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">
-      {analysisFailed && (
-        <div className="mb-6 rounded-2xl border border-yellow-300 bg-yellow-50 p-4 text-sm text-yellow-900">
-          No pudimos calcular tu brecha de habilidades ni tu roadmap. Los indicadores de abajo están en cero
-          hasta que el análisis vuelva a responder.
-        </div>
-      )}
-
-      {/* FastAPI Safe Connection status Header */}
-      <div className="mb-6 flex items-center justify-between rounded-2xl border border-outline-variant bg-white p-4 shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-green-50 p-2 text-green-600">
-            <ShieldCheck className="h-5 w-5" />
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-on-surface">Conexión Segura FastAPI</h2>
-            <p className="text-xs text-on-surface-variant">
-              Sesión activa: {session?.user?.email || profile.email}
-            </p>
-          </div>
-        </div>
-        <Button variant="ghost" size="sm" onClick={handleLogout} className="text-xs">
-          <LogOut className="mr-1.5 h-3.5 w-3.5" />
-          Cerrar Sesión
-        </Button>
-      </div>
-
       <section className="mb-6 overflow-hidden rounded-2xl gradient-brand p-6 text-white shadow-glow md:p-8">
         <p className="text-xs uppercase tracking-widest text-white/80">Tu ruta hacia {target.label}</p>
         <h1 className="mt-1 font-display text-2xl font-bold md:text-3xl">
