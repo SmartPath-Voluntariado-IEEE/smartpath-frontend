@@ -1,0 +1,43 @@
+{
+  "skill_name": "brand-guidelines",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create a modern skill card component for React/Next.js with Tailwind CSS showing skill title, percentage progress, status badge, and course recommendation button.",
+      "expected_output": "Component uses white surface (#FFFFFF), 16px border-radius, soft card shadow (0 4px 20px rgba(13,17,51,0.06)), Poppins typography, primary purple (#6E43FF) button, status badge with 999px radius, and Lucide icons.",
+      "assertions": [
+        {
+          "name": "uses_official_card_radius",
+          "description": "Checks if card uses 16px border-radius (rounded-2xl or rounded-[16px])"
+        },
+        {
+          "name": "uses_brand_purple",
+          "description": "Checks if primary color #6E43FF is used for primary actions"
+        },
+        {
+          "name": "uses_pill_radius_for_badges",
+          "description": "Checks if status badge uses 999px radius (rounded-full)"
+        },
+        {
+          "name": "uses_lucide_icons",
+          "description": "Checks if icons are imported from lucide-react"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Audit the AppHeader component and globals.css to verify if navigation active states and theme color variables match Smartpath brand guidelines.",
+      "expected_output": "Verifies that active navigation links use #F3F0FF background tint and #6E43FF text, and that brand gradient includes all 4 stops (#6E43FF, #3D5AFE, #00B4DB, #00C48C).",
+      "assertions": [
+        {
+          "name": "active_nav_tint",
+          "description": "Active link styling matches #F3F0FF background and #6E43FF text"
+        },
+        {
+          "name": "brand_gradient_stops",
+          "description": "Primary brand gradient includes 4 stops from purple to mint green"
+        }
+      ]
+    }
+  ]
+}

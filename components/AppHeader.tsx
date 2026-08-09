@@ -47,8 +47,8 @@ export function AppHeader() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                    active ? "bg-surface-container-high text-on-surface" : "text-on-surface-variant hover:text-primary"
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                    active ? "bg-[#F3F0FF] text-[#6E43FF] font-semibold" : "text-[#6B7280] hover:text-[#6E43FF]"
                   }`}
                 >
                   {item.label}

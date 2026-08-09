@@ -188,7 +188,7 @@ function CoursesContent() {
                   </div>
                 )}
                 <h3 className="mt-3 font-display text-lg font-semibold leading-snug text-on-surface">{c.title}</h3>
-                <p className="mt-2 text-sm text-on-surface-variant italic">"{c.why}"</p>
+                <p className="mt-2 text-sm text-on-surface-variant italic">&quot;{c.why}&quot;</p>
                 <div className="mt-4 grid grid-cols-2 gap-2 text-center text-xs text-on-surface-variant">
                   <div><div className="font-semibold text-on-surface">{c.hours}h</div>Duración</div>
                   <div><div className="font-semibold text-on-surface">{c.level}</div>Nivel</div>
