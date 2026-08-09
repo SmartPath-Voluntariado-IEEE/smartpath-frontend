@@ -1,4 +1,3 @@
-
 # Smartpath — DESIGN.md
 
 > Sistema de diseño y lineamientos visuales para el desarrollo del MVP.
@@ -86,17 +85,17 @@ No utilizar una interfaz completamente oscura para el MVP.
 
 ## Colores principales
 
-| Token | Color | Hex | Uso |
-|---|---|---|---|
-| `primary` | Púrpura | `#6E43FF` | Acciones principales, roadmap, botones |
-| `indigo` | Índigo | `#3D5AFE` | Links, estados activos, énfasis |
-| `cyan` | Azul | `#00B4DB` | Progreso, tecnología, información |
-| `success` | Verde | `#00C48C` | Completado, éxito |
-| `accent` | Naranja | `#FF8A00` | Destacados, llamados de atención |
-| `text-primary` | Azul oscuro | `#0D1133` | Títulos y texto principal |
-| `text-secondary` | Gris | `#6B7280` | Texto secundario |
-| `border` | Gris claro | `#E5E7EB` | Bordes |
-| `background` | Blanco | `#FFFFFF` | Fondo principal |
+| Token              | Color       | Hex         | Uso                                    |
+| ------------------ | ----------- | ----------- | -------------------------------------- |
+| `primary`        | Púrpura    | `#6E43FF` | Acciones principales, roadmap, botones |
+| `indigo`         | Índigo     | `#3D5AFE` | Links, estados activos, énfasis       |
+| `cyan`           | Azul        | `#00B4DB` | Progreso, tecnología, información    |
+| `success`        | Verde       | `#00C48C` | Completado, éxito                     |
+| `accent`         | Naranja     | `#FF8A00` | Destacados, llamados de atención      |
+| `text-primary`   | Azul oscuro | `#0D1133` | Títulos y texto principal             |
+| `text-secondary` | Gris        | `#6B7280` | Texto secundario                       |
+| `border`         | Gris claro  | `#E5E7EB` | Bordes                                 |
+| `background`     | Blanco      | `#FFFFFF` | Fondo principal                        |
 
 ---
 
@@ -114,7 +113,7 @@ background: linear-gradient(
   #00B4DB 70%,
   #00C48C 100%
 );
-````
+```
 
 ### Gradiente de acento
 
