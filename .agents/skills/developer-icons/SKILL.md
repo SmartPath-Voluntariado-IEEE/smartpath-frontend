@@ -31,13 +31,13 @@ npm i developer-icons
 All icons are exported as named React components matching exact technology names in PascalCase.
 
 ```tsx
-import { 
-  HTML5, 
-  JavaScript, 
-  TypeScript, 
-  React, 
-  Python, 
-  Git, 
+import {
+  HTML5,
+  JavaScript,
+  TypeScript,
+  React,
+  Python,
+  Git,
   PostgreSQL,
   Docker,
   TailwindCSS
