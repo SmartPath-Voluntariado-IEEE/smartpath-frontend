@@ -102,12 +102,21 @@ export function LevelRow({
                   Actual
                 </Badge>
               )}
+              {/* El roadmap no se recorta al plazo del usuario: se marca
+                  desde dónde deja de caber, y él decide si amplía el plazo
+                  o sube sus horas semanales. */}
+              {level.withinTarget === false && (
+                <Badge className="border border-amber-200 bg-amber-50 font-semibold text-amber-700 hover:bg-amber-50">
+                  Fuera de tu plazo
+                </Badge>
+              )}
             </div>
 
             {/* Right Meta & Toggle */}
             <div className="flex items-center gap-3 self-end md:self-auto">
               <span className="text-xs font-semibold text-text-secondary">
                 {totalSkillsCount} {totalSkillsCount === 1 ? "skill" : "skills"}
+                {level.estHours ? ` · ~${level.estHours}h` : ""}
               </span>
               <button
                 onClick={() => setExpanded(!expanded)}
@@ -142,15 +151,19 @@ export function LevelRow({
           {expanded && (
             <div className="mt-6 pt-4 border-t border-border-light">
               <div className="flex flex-wrap gap-4 justify-start">
-                {level.skills.map((skill) => {
+                {level.skills.map((skill, skillIndex) => {
                   const percent = getSkillPercent(skill.skill_slug);
-                  const skillCourses = coursesForSkill(skill.skill_slug);
+                  // El backend ya devuelve el conteo; el catálogo local solo
+                  // se usa como respaldo si el campo aún no viene.
+                  const courseCount =
+                    skill.courseCount ?? coursesForSkill(skill.skill_slug).length;
                   return (
                     <SkillCard
                       key={skill.skill_slug}
                       skill={skill}
                       progressPercent={percent}
-                      courseCount={skillCourses.length}
+                      courseCount={courseCount}
+                      rank={skillIndex}
                       accentColorHex={levelColor.hex}
                     />
                   );

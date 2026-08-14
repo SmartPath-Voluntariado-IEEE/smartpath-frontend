@@ -178,21 +178,33 @@ function CoursesContent() {
               <div key={i} className="surface-card flex flex-col p-5 bg-white relative">
                 <div className="flex items-start justify-between gap-2 text-on-surface">
                   <Badge variant="secondary">{c.platform}</Badge>
-                  <span className="text-sm font-semibold text-amber-500">⭐ {c.rating}</span>
+                  {c.rating != null && (
+                    <span className="text-sm font-semibold text-amber-500">⭐ {c.rating}</span>
+                  )}
                 </div>
-                {matchesPref && (
-                  <div className="mt-2">
+                {/* La gratuidad es el criterio que más pesa en el orden que
+                    devuelve el backend, así que se destaca sobre el resto. */}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {c.is_free && (
+                    <Badge className="bg-green-100 text-green-800 border-green-200 text-[11px] hover:bg-green-100">
+                      Gratis
+                    </Badge>
+                  )}
+                  {matchesPref && (
                     <Badge className="bg-primary/10 text-primary border-primary/20 text-[11px]">
                       🎯 Coincide con tu formato preferido
                     </Badge>
-                  </div>
-                )}
+                  )}
+                </div>
                 <h3 className="mt-3 font-display text-lg font-semibold leading-snug text-on-surface">{c.title}</h3>
+                {c.institution && (
+                  <p className="mt-1 text-xs font-medium text-on-surface-variant">{c.institution}</p>
+                )}
                 <p className="mt-2 text-sm text-on-surface-variant italic">&quot;{c.why}&quot;</p>
                 <div className="mt-4 grid grid-cols-2 gap-2 text-center text-xs text-on-surface-variant">
-                  <div><div className="font-semibold text-on-surface">{c.hours}h</div>Duración</div>
-                  <div><div className="font-semibold text-on-surface">{c.level}</div>Nivel</div>
-                  <div><div className="font-semibold text-on-surface">{c.price}</div>Precio</div>
+                  <div><div className="font-semibold text-on-surface">{c.hours ? `${c.hours}h` : "—"}</div>Duración</div>
+                  <div><div className="font-semibold text-on-surface">{c.level || "—"}</div>Nivel</div>
+                  <div><div className="font-semibold text-on-surface">{c.is_free ? "Gratis" : c.price || "—"}</div>Precio</div>
                   <div><div className="font-semibold text-on-surface capitalize">{c.style}</div>Estilo</div>
                 </div>
                 <Button variant="outline" className="mt-5 w-full border-outline-variant text-on-surface" onClick={() => window.open(c.url, "_blank", "noreferrer,noopener")}>
