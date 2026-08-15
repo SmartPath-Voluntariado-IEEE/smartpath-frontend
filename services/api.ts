@@ -186,8 +186,32 @@ export async function getCatalogJobs(): Promise<any> {
   return response.data;
 }
 
-export async function getCatalogCourses(skillSlug?: string): Promise<any> {
-  const params = skillSlug ? { params: { skill: skillSlug } } : {};
+export interface CatalogCourse {
+  id: number;
+  platform: string | null;
+  title: string | null;
+  instructor: string | null;
+  duration_hours: number | null;
+  language: string | null;
+  price: string | null;
+  rating: number | null;
+  level: string | null;
+  certificate: boolean;
+  url: string | null;
+  skill_slugs: string[];
+}
+
+export async function getCatalogCourses(
+  skillSlug?: string,
+  pagination: { limit?: number; offset?: number } = {},
+): Promise<CatalogCourse[]> {
+  const params = {
+    params: {
+      ...(skillSlug ? { skill: skillSlug } : {}),
+      limit: pagination.limit ?? 12,
+      offset: pagination.offset ?? 0,
+    },
+  };
   const response = await api.get("/catalog/courses", params);
   return response.data;
 }
