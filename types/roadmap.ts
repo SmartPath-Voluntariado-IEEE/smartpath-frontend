@@ -3,12 +3,21 @@ export interface RoadmapSkill {
   name: string;
   marketFreq: number;
   estHours: number;
+  /** Score de priorización del backend: demanda, brecha, cursos e intereses. */
+  priority: number;
+  courseCount: number;
+  freeCourseCount: number;
 }
 
 export interface RoadmapLevel {
   level: number;
   label: string;
   skills: RoadmapSkill[];
+  estHours: number;
+  cumulativeHours: number;
+  estimatedWeeks: number;
+  /** false cuando el nivel se sale del plazo declarado por el usuario. */
+  withinTarget: boolean;
 }
 
 export interface GapSkill {
