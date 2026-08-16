@@ -6,10 +6,10 @@ import { useProfile } from "@/hooks/use-profile";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import { usePathname, useRouter } from "next/navigation";
+import { UserCircle } from "lucide-react";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/perfil", label: "Perfil" },
   { href: "/roadmap", label: "Roadmap" },
   { href: "/cursos", label: "Cursos" },
 ] as const;
@@ -17,10 +17,10 @@ const NAV = [
 export function AppHeader() {
   const pathname = usePathname();
   const { profile, hydrated, clear } = useProfile();
-  const isAuthed = hydrated && !!profile;
+  const isLanding = pathname === "/";
+  const isAuthed = hydrated && !!profile && !isLanding;
   const router = useRouter();
 
-  // Ocultar el navbar durante el flujo de onboarding
   if (pathname === "/onboarding") {
     return null;
   }
@@ -33,7 +33,7 @@ export function AppHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-outline-variant bg-surface/80 backdrop-blur-lg">
+    <header className="sticky top-0 z-40 bg-surface/80 shadow-sm backdrop-blur-lg">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
         <Link href="/" className="flex items-center gap-2">
           <img src="/img/logo.png" alt="SmartPath Logo" className="h-15 w-auto object-contain" />
@@ -61,9 +61,19 @@ export function AppHeader() {
         <div className="flex items-center gap-2">
           {isAuthed ? (
             <>
-              <span className="hidden text-sm text-on-surface-variant sm:inline">
-                {profile?.fullName || profile?.email}
-              </span>
+              <Link
+                href="/perfil"
+                className={`flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium transition-colors ${
+                  pathname.startsWith("/perfil")
+                    ? "bg-[#F3F0FF] text-[#6E43FF] font-semibold"
+                    : "text-[#6B7280] hover:text-[#6E43FF]"
+                }`}
+              >
+                <UserCircle className="h-5 w-5" />
+                <span className="hidden sm:inline">
+                  {profile?.fullName || profile?.email}
+                </span>
+              </Link>
               <Button variant="ghost" size="sm" onClick={handleLogout}>
                 Salir
               </Button>
