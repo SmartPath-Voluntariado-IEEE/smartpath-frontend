@@ -56,6 +56,21 @@ function computeMarketSkillFrequency(jobs: any[], skills: any[]) {
     .sort((a, b) => b.count - a.count);
 }
 
+const FOCUS_PHRASES = [
+  "Un paso pequeño hoy es un gran salto mañana.",
+  "La constancia vence al talento cuando el talento no es constante.",
+  "No busques la perfección, busca el progreso.",
+  "Cada línea de código te acerca a tu meta.",
+  "Hoy es un buen día para aprender algo nuevo.",
+  "Lo que practicas hoy, lo dominas mañana.",
+  "Pequeños hábitos, grandes resultados.",
+  "Tu futuro yo te lo va a agradecer.",
+];
+
+function pickFocusPhrase(): string {
+  return FOCUS_PHRASES[Math.floor(Math.random() * FOCUS_PHRASES.length)];
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { session, loading: authLoading } = useRequireAuth();
@@ -118,7 +133,6 @@ const DEFAULT_SKILLS = [
         let profileData = await getBackendProfile(session.access_token).catch(() => null);
 
         if (!profileData) {
-          // Si el perfil no existe en la base de datos (404), intentamos sincronizar desde localStorage si existe
           const local = loadProfile();
           if (local && local.onboardingComplete) {
             try {
@@ -130,7 +144,6 @@ const DEFAULT_SKILLS = [
         }
 
         if (!isOnboardingComplete(profileData)) {
-          // Sin perfil, o con el onboarding del chatbot a medias: lo retomamos.
           router.push("/onboarding");
           return;
         }
@@ -147,8 +160,6 @@ const DEFAULT_SKILLS = [
           targetMonths: profileData.target_months || 6,
           targetRoleId: profileData.target_role_id || "fullstack",
           interests: profileData.interests || [],
-          // experience_level guarda la etapa académica de la HU-29; los tipos de
-          // experiencia siguen viviendo solo en el perfil local.
           experience: loadProfile()?.experience ?? [],
           learningPreferences: profileData.learning_preferences || [],
           languages: profileData.english_level ? profileData.english_level.split(", ") : ["Español"],
@@ -168,9 +179,6 @@ const DEFAULT_SKILLS = [
           setRoadmap(roadmapData);
         } catch (gapErr) {
           console.warn("No se pudieron cargar brecha y roadmap:", gapErr);
-          // El fallback debe respetar el contrato del backend
-          // (GapAnalysisResponse y List[RoadmapLevel]); si no, el render
-          // revienta al leer gap.coverage o level.skills.
           setGap({ target_role: null, mastered: [], partial: [], missing: [], coverage: 0 });
           setRoadmap([]);
           setAnalysisFailed(true);
@@ -220,7 +228,6 @@ const DEFAULT_SKILLS = [
 
   const target = roles.find((r) => r.id === profile.targetRoleId) ?? roles[0];
   const market = computeMarketSkillFrequency(jobs, skills);
-  // roadmap y gap pueden seguir en null si la carga se cortó antes del catch.
   const levels: any[] = Array.isArray(roadmap) ? roadmap : [];
   const totalHours = levels.reduce(
     (acc: number, l: any) => acc + (l.skills ?? []).reduce((a: number, s: any) => a + (s.estHours ?? 0), 0),
@@ -232,34 +239,82 @@ const DEFAULT_SKILLS = [
   const missing: any[] = gap?.missing ?? [];
   const progressPct = Math.round(coverage * 100);
   const quote = pickQuote(profile.fullName || "", progressPct);
+  const focusPhrase = pickFocusPhrase();
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">
-      <section className="mb-6 overflow-hidden rounded-2xl gradient-brand p-6 text-white shadow-glow md:p-8">
-        <p className="text-xs uppercase tracking-widest text-white/80">Tu ruta hacia {target.label}</p>
-        <h1 className="mt-1 font-display text-2xl font-bold md:text-3xl">
-          {profile.fullName ? `¡Hola, ${profile.fullName.split(" ")[0]}!` : "¡Hola!"} {quote.emoji}
-        </h1>
-        <p className="mt-2 max-w-2xl text-white/90">{quote.text}</p>
-        <div className="mt-5 flex flex-wrap items-center gap-4">
-          <div className="flex-1 min-w-[220px]">
-            <div className="mb-1 flex items-center justify-between text-xs text-white/80">
-              <span>Avance de tu roadmap</span>
-              <span className="font-semibold">{progressPct}%</span>
-            </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-white/20">
-              <div className="h-full bg-white transition-all" style={{ width: `${progressPct}%` }} />
-            </div>
+      <section className="mb-6">
+        
+        {/* Cabecera externa: Saludo a la izquierda y Racha a la derecha */}
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-4 px-1">
+          <div>
+            <h1 className="font-display text-2xl font-bold md:text-3xl text-gray-900">
+              {profile.fullName ? `¡Hola, ${profile.fullName.split(" ")[0]}!` : "¡Hola!"} 👋
+            </h1>
+            <p className="mt-0.5 text-sm text-gray-600">
+              Tu ruta personalizada hacia <span className="font-semibold text-gray-900">{target.label}</span>
+            </p>
           </div>
-          <div className="flex gap-2">
-            <Link href="/roadmap" className="inline-flex h-8 items-center justify-center rounded-lg bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] px-3 text-sm font-medium">
-              Ver roadmap
-            </Link>
-            <Link href="/cursos" className="inline-flex h-8 items-center justify-center rounded-lg bg-white text-primary hover:bg-white/90 border border-outline-variant px-3 text-sm font-medium">
-              Cursos IA
-            </Link>
+          
+          <div className="flex shrink-0 items-center gap-2 rounded-full bg-white border border-gray-100 px-4 py-2 text-sm font-semibold text-orange-500 shadow-sm">
+            🔥 Racha de <span className="text-gray-900">10 días</span>
           </div>
         </div>
+
+        
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#6E43FF] via-[#8B5CF6] to-[#FF7A45] p-6 text-white shadow-glow md:p-8">
+          
+          
+          <div className="absolute inset-0 pointer-events-none">
+            <img
+              src="/img/mountain-illustration.png"
+              alt="Ilustración de progreso hacia la meta"
+              className="absolute right-0 top-0 h-full w-full object-cover opacity-90"
+            />
+           
+            <div className="absolute inset-y-0 left-0 w-full md:w-1/2 bg-gradient-to-r from-[#5B2FE0]/90 via-[#6E43FF]/60 to-transparent"></div>
+          </div>
+
+        
+          <div className="relative z-10 grid gap-6 md:grid-cols-[280px_1fr_auto] items-center">
+            
+          
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-white/90">Tu progreso general</p>
+              <p className="mt-1 font-display text-5xl md:text-6xl font-bold tracking-tight">{progressPct}%</p>
+              
+              <div className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-white/20">
+                <div className="h-full rounded-full bg-white transition-all" style={{ width: `${progressPct}%` }} />
+              </div>
+              
+              <p className="mt-3 text-sm text-white/90 leading-snug">Sigue así, cada paso te acerca a tu objetivo.</p>
+              
+              <Link
+                href="/roadmap"
+                className="mt-5 inline-flex h-10 items-center justify-center whitespace-nowrap gap-1.5 rounded-xl bg-white px-5 text-sm font-semibold text-[#6E43FF] shadow-md transition-transform hover:scale-105"
+              >
+                Ver mi roadmap →
+              </Link>
+            </div>
+
+          
+            <div className="hidden md:block"></div>
+
+            
+            <div className="flex justify-center md:justify-end">
+              <div className="w-full sm:w-72 rounded-2xl bg-white p-4 text-gray-900 shadow-xl backdrop-blur-md">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-gray-800">⚙️ Enfoque de hoy</p>
+                  <span className="text-gray-400 font-bold tracking-widest text-xs">•••</span>
+                </div>
+                
+                <p className="mt-1.5 text-xs text-gray-600">{focusPhrase}</p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
       </section>
 
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -278,7 +333,7 @@ const DEFAULT_SKILLS = [
         </div>
       </header>
 
-      {/* Stat cards */}
+    
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard label="Cobertura del rol" value={`${progressPct}%`} hint={`${mastered.length}/${target.core_skill_slugs?.length ?? target.coreSkills?.length ?? 0} skills clave dominadas`} />
         <StatCard label="Skills por aprender" value={String(missing.length)} hint="Priorizadas por demanda" />
@@ -286,7 +341,6 @@ const DEFAULT_SKILLS = [
         <StatCard label="Ofertas analizadas" value={String(jobs.length)} hint="Mercado peruano" />
       </div>
 
-      {/* Coverage bar */}
       <section className="surface-card mt-6 p-6">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-display text-lg font-semibold text-on-surface">Tu preparación para {target.label}</h2>
@@ -301,7 +355,7 @@ const DEFAULT_SKILLS = [
       </section>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        {/* Top demand */}
+  
         <section className="surface-card lg:col-span-2 p-6">
           <h2 className="font-display text-lg font-semibold text-on-surface">Top skills demandadas en el mercado</h2>
           <p className="mt-1 text-sm text-on-surface-variant">Frecuencia de aparición en ofertas analizadas.</p>
@@ -329,7 +383,7 @@ const DEFAULT_SKILLS = [
           </ul>
         </section>
 
-        {/* Next steps */}
+  
         <section className="surface-card p-6">
           <h2 className="font-display text-lg font-semibold text-on-surface">Próximos pasos</h2>
           <p className="mt-1 text-sm text-on-surface-variant">Empieza por lo más rentable.</p>
@@ -362,7 +416,7 @@ const DEFAULT_SKILLS = [
         </section>
       </div>
 
-      {/* Recent jobs */}
+
       <section className="surface-card mt-6 p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-display text-lg font-semibold text-on-surface">Ofertas recientes analizadas</h2>
@@ -378,7 +432,8 @@ const DEFAULT_SKILLS = [
                     <div className="font-semibold text-on-surface">{j.position}</div>
                     <div className="text-sm text-on-surface-variant">{j.company} · {j.location}</div>
                   </div>
-                  <Badge variant="secondary">{j.seniority}</Badge>
+                  <Badge variant="secondary" className="text-white">{j.seniority}</Badge>
+                  
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {jobSkills.slice(0, 6).map((s: any) => (

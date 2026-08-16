@@ -174,10 +174,11 @@ function CoursesContent() {
             const matchesPref = profile?.learningPreferences?.some(
               (p) => c.style?.toLowerCase().includes(p.toLowerCase()) || (p === "video" && c.style?.toLowerCase().includes("video"))
             );
+            console.log("Datos del curso:", c);
             return (
               <div key={i} className="surface-card flex flex-col p-5 bg-white relative">
                 <div className="flex items-start justify-between gap-2 text-on-surface">
-                  <Badge variant="secondary">{c.platform}</Badge>
+                  <Badge variant="secondary" className="text-white">{c.platform}</Badge>
                   <span className="text-sm font-semibold text-amber-500">⭐ {c.rating}</span>
                 </div>
                 {matchesPref && (
@@ -195,6 +196,7 @@ function CoursesContent() {
                   <div><div className="font-semibold text-on-surface">{c.price}</div>Precio</div>
                   <div><div className="font-semibold text-on-surface capitalize">{c.style}</div>Estilo</div>
                 </div>
+                
                 <Button variant="outline" className="mt-5 w-full border-outline-variant text-on-surface" onClick={() => window.open(c.url, "_blank", "noreferrer,noopener")}>
                   Ver curso
                 </Button>
