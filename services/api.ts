@@ -238,3 +238,99 @@ export async function getCourseRecommendations(token: string, skillSlug: string)
   });
   return response.data;
 }
+
+/** Vincula un curso a una skill del roadmap del usuario. */
+export async function selectCourseForSkill(
+  token: string,
+  skillSlug: string,
+  courseId: number
+): Promise<any> {
+  const response = await api.post(
+    `/roadmap/skills/${skillSlug}/select-course`,
+    null,
+    {
+      ...getAuthHeader(token),
+      params: { course_id: courseId },
+    }
+  );
+  return response.data;
+}
+
+/** Desvincula el curso de una skill y resetea el progreso asociado. */
+export async function unlinkCourseFromSkill(token: string, skillSlug: string): Promise<any> {
+  const response = await api.delete(
+    `/roadmap/skills/${skillSlug}/course`,
+    getAuthHeader(token)
+  );
+  return response.data;
+}
+
+export interface CourseModule {
+  id: string;
+  course_id: number;
+  module_order: number;
+  title: string;
+  content_summary: string | null;
+  score: number | null;
+  passed: boolean;
+  attempts: number;
+}
+
+/** Obtiene (o dispara la extracción con IA si no existen) los módulos de un curso. */
+export async function getCourseModules(token: string, courseId: number): Promise<CourseModule[]> {
+  const response = await api.get(`/courses/${courseId}/modules`, getAuthHeader(token));
+  return response.data;
+}
+
+export interface QuizQuestion {
+  id: string;
+  question: string;
+  options: string[];
+}
+
+/** Obtiene (o genera) las 10 preguntas del examen de un módulo. */
+export async function getModuleQuiz(token: string, moduleId: string): Promise<QuizQuestion[]> {
+  const response = await api.get(`/modules/${moduleId}/quiz`, getAuthHeader(token));
+  return response.data;
+}
+
+export interface QuizAnswer {
+  question_id: string;
+  selected_option: number;
+}
+
+export interface QuizResult {
+  module_id: string;
+  score: number;
+  correct_answers: number;
+  total_questions: number;
+  passed: boolean;
+}
+
+/** Envía las respuestas del examen de un módulo y devuelve el resultado. */
+export async function submitModuleQuiz(
+  token: string,
+  moduleId: string,
+  answers: QuizAnswer[]
+): Promise<QuizResult> {
+  const response = await api.post(
+    `/modules/${moduleId}/submit`,
+    answers,
+    getAuthHeader(token)
+  );
+  return response.data;
+}
+
+export interface CourseProgressSummary {
+  skill_slug: string;
+  course_id: number | null;
+  course_title: string | null;
+  course_url: string | null;
+  progress: { completed: number; total: number; percentage: number } | null;
+}
+
+/** Resumen de progreso de cursos por skill, para el dashboard. */
+export async function getDashboardCourseProgress(token: string): Promise<CourseProgressSummary[]> {
+  const response = await api.get("/dashboard/course-progress", getAuthHeader(token));
+  return response.data;
+}

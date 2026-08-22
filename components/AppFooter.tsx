@@ -59,7 +59,6 @@ export function AppFooter() {
             </div>
           </div>
 
-          {/* Producto */}
           <div>
             <h3 className="text-sm font-semibold text-white">PRODUCTO</h3>
             <ul className="mt-4 space-y-2.5">
@@ -71,7 +70,6 @@ export function AppFooter() {
             </ul>
           </div>
 
-          {/* Empresa */}
           <div>
             <h3 className="text-sm font-semibold text-white">EMPRESA</h3>
             <ul className="mt-4 space-y-2.5">
@@ -83,7 +81,6 @@ export function AppFooter() {
             </ul>
           </div>
 
-          {/* Legal */}
           <div>
             <h3 className="text-sm font-semibold text-white">LEGAL</h3>
             <ul className="mt-4 space-y-2.5">
@@ -96,7 +93,6 @@ export function AppFooter() {
           </div>
         </div>
 
-        {/* Contacto */}
         <div className="mt-10 flex flex-col gap-2 border-t border-white/10 pt-8 text-sm text-white/70 md:flex-row md:items-center md:justify-end md:gap-8">
           <span className="flex items-center gap-1.5">
             Hecho con <Heart className="h-4 w-4 fill-red-500 text-red-500" /> en Perú
@@ -112,7 +108,7 @@ export function AppFooter() {
           </span>
         </div>
 
-        {/* Copyright */}
+        
         <div className="mt-6 border-t border-white/10 pt-6 text-center text-xs text-white/40">
           © 2026 Smartpath. Todos los derechos reservados.
         </div>

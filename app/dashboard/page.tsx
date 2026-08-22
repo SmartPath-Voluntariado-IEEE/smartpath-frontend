@@ -8,8 +8,9 @@ import { useProfile } from "@/hooks/use-profile";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, LogOut, ShieldCheck } from "lucide-react";
+import { Loader2, BookOpen, ArrowRight, CheckCircle2, FileText, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { useRequireAuth } from "@/hooks/use-require-auth";
+import { QuizModal } from "@/components/courses/QuizModal";
 import {
   getBackendProfile,
   upsertBackendProfile,
@@ -19,6 +20,8 @@ import {
   getCatalogSkills,
   getCatalogRoles,
   isOnboardingComplete,
+  getDashboardCourseProgress,
+  getCourseModules,
 } from "@/services/api";
 import { loadProfile, type UserProfile } from "@/lib/profile-store";
 
@@ -70,50 +73,76 @@ const FOCUS_PHRASES = [
 function pickFocusPhrase(): string {
   return FOCUS_PHRASES[Math.floor(Math.random() * FOCUS_PHRASES.length)];
 }
+function getModuleStatusLabel(mod: any): string {
+  if (mod.attempts === 0) return "Módulo pendiente";
+  if (mod.passed) return "Módulo completado";
+  return "Falta validar";
+}
+
+function getModuleStatusStyle(mod: any): string {
+  if (mod.attempts === 0) return "bg-gray-100 text-gray-600";
+  if (mod.passed) return "bg-emerald-50 text-emerald-700";
+  return "bg-amber-50 text-amber-700";
+}
+
+function isModuleLocked(modulesList: any[], index: number): boolean {
+  if (index === 0) return false;
+  return !modulesList[index - 1]?.passed;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
   const { session, loading: authLoading } = useRequireAuth();
-  const { profile, hydrated, save, clear } = useProfile();
+  const { profile, hydrated, save } = useProfile();
   const [loadingData, setLoadingData] = useState(true);
   
   const [gap, setGap] = useState<any>(null);
   const [roadmap, setRoadmap] = useState<any>(null);
-  const [analysisFailed, setAnalysisFailed] = useState(false);
   const [jobs, setJobs] = useState<any[]>([]);
   const [skills, setSkills] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
+  const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
 
-const DEFAULT_ROLES = [
-  { id: "backend", label: "Backend Developer", core_skill_slugs: ["java", "springboot", "rest", "sql", "postgres", "docker", "git", "aws"] },
-  { id: "frontend", label: "Frontend Developer", core_skill_slugs: ["javascript", "typescript", "react", "nextjs", "tailwind", "git", "rest"] },
-  { id: "fullstack", label: "Full Stack Developer", core_skill_slugs: ["typescript", "react", "nodejs", "postgres", "git", "rest", "docker"] },
-  { id: "data-analyst", label: "Data Analyst", core_skill_slugs: ["sql", "excel", "powerbi", "python", "pandas", "english"] },
-  { id: "data-engineer", label: "Data Engineer", core_skill_slugs: ["python", "sql", "postgres", "docker", "linux", "gcp", "aws"] },
-  { id: "ml", label: "Machine Learning Engineer", core_skill_slugs: ["python", "pandas", "tensorflow", "sql", "docker", "aws", "english"] },
-  { id: "devops", label: "DevOps Engineer", core_skill_slugs: ["linux", "docker", "kubernetes", "aws", "git", "python"] }
-];
+  // Estado para almacenar los módulos cargados de cada curso inscrito: { [courseId]: Module[] }
+  const [courseModulesMap, setCourseModulesMap] = useState<Record<string, any[]>>({});
+  const [loadingModulesId, setLoadingModulesId] = useState<string | null>(null);
+  
+  // Estado para expandir o contraer las tarjetas de cursos en el dashboard
+  const [expandedCourses, setExpandedCourses] = useState<Record<string, boolean>>({});
 
-const DEFAULT_SKILLS = [
-  { id: 1, slug: "python", name: "Python", category: "language" },
-  { id: 2, slug: "javascript", name: "JavaScript", category: "language" },
-  { id: 3, slug: "typescript", name: "TypeScript", category: "language" },
-  { id: 4, slug: "java", name: "Java", category: "language" },
-  { id: 5, slug: "react", name: "React", category: "framework" },
-  { id: 6, slug: "nextjs", name: "Next.js", category: "framework" },
-  { id: 7, slug: "nodejs", name: "Node.js", category: "framework" },
-  { id: 8, slug: "springboot", name: "Spring Boot", category: "framework" },
-  { id: 9, slug: "docker", name: "Docker", category: "tool" },
-  { id: 10, slug: "sql", name: "SQL", category: "language" },
-  { id: 11, slug: "postgres", name: "PostgreSQL", category: "database" },
-  { id: 12, slug: "tailwind", name: "Tailwind CSS", category: "framework" },
-  { id: 13, slug: "aws", name: "AWS", category: "cloud" },
-  { id: 14, slug: "powerbi", name: "Power BI", category: "tool" },
-  { id: 15, slug: "pandas", name: "Pandas", category: "framework" },
-  { id: 16, slug: "linux", name: "Linux", category: "tool" },
-  { id: 17, slug: "git", name: "Git", category: "tool" },
-  { id: 18, slug: "rest", name: "REST APIs", category: "concept" }
-];
+  // Estado para el QuizModal activo
+  const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
+
+  const DEFAULT_ROLES = [
+    { id: "backend", label: "Backend Developer", core_skill_slugs: ["java", "springboot", "rest", "sql", "postgres", "docker", "git", "aws"] },
+    { id: "frontend", label: "Frontend Developer", core_skill_slugs: ["javascript", "typescript", "react", "nextjs", "tailwind", "git", "rest"] },
+    { id: "fullstack", label: "Full Stack Developer", core_skill_slugs: ["typescript", "react", "nodejs", "postgres", "git", "rest", "docker"] },
+    { id: "data-analyst", label: "Data Analyst", core_skill_slugs: ["sql", "excel", "powerbi", "python", "pandas", "english"] },
+    { id: "data-engineer", label: "Data Engineer", core_skill_slugs: ["python", "sql", "postgres", "docker", "linux", "gcp", "aws"] },
+    { id: "ml", label: "Machine Learning Engineer", core_skill_slugs: ["python", "pandas", "tensorflow", "sql", "docker", "aws", "english"] },
+    { id: "devops", label: "DevOps Engineer", core_skill_slugs: ["linux", "docker", "kubernetes", "aws", "git", "python"] }
+  ];
+
+  const DEFAULT_SKILLS = [
+    { id: 1, slug: "python", name: "Python", category: "language" },
+    { id: 2, slug: "javascript", name: "JavaScript", category: "language" },
+    { id: 3, slug: "typescript", name: "TypeScript", category: "language" },
+    { id: 4, slug: "java", name: "Java", category: "language" },
+    { id: 5, slug: "react", name: "React", category: "framework" },
+    { id: 6, slug: "nextjs", name: "Next.js", category: "framework" },
+    { id: 7, slug: "nodejs", name: "Node.js", category: "framework" },
+    { id: 8, slug: "springboot", name: "Spring Boot", category: "framework" },
+    { id: 9, slug: "docker", name: "Docker", category: "tool" },
+    { id: 10, slug: "sql", name: "SQL", category: "language" },
+    { id: 11, slug: "postgres", name: "PostgreSQL", category: "database" },
+    { id: 12, slug: "tailwind", name: "Tailwind CSS", category: "framework" },
+    { id: 13, slug: "aws", name: "AWS", category: "cloud" },
+    { id: 14, slug: "powerbi", name: "Power BI", category: "tool" },
+    { id: 15, slug: "pandas", name: "Pandas", category: "framework" },
+    { id: 16, slug: "linux", name: "Linux", category: "tool" },
+    { id: 17, slug: "git", name: "Git", category: "tool" },
+    { id: 18, slug: "rest", name: "REST APIs", category: "concept" }
+  ];
 
   useEffect(() => {
     if (!session) return;
@@ -171,17 +200,51 @@ const DEFAULT_SKILLS = [
         save(mappedProfile);
         
         try {
-          const [gapData, roadmapData] = await Promise.all([
+          const [gapData, roadmapData, courseProgressData] = await Promise.all([
             getGapAnalysis(session.access_token),
-            getRoadmap(session.access_token)
+            getRoadmap(session.access_token),
+            getDashboardCourseProgress(session.access_token).catch(() => [])
           ]);
+          
+          // 🔍 DEBUG 1: Ver qué devuelve exactamente la API de cursos
+          console.log("🔍 [DEBUG] courseProgressData recibido:", courseProgressData);
+
           setGap(gapData);
           setRoadmap(roadmapData);
+          
+          // Filtramos de forma flexible aceptando course_id o id
+          const validCourses = Array.isArray(courseProgressData) 
+            ? courseProgressData.filter((c: any) => c && (c.course_id || c.id)) 
+            : [];
+          
+          console.log("🔍 [DEBUG] validCourses filtrados:", validCourses);
+          setEnrolledCourses(validCourses);
+
+          // Precargamos los módulos para cada curso inscrito de manera automática
+          // Precargamos los módulos para cada curso inscrito de manera automática
+          if (validCourses.length > 0) {
+            const modulesMap: Record<string, any[]> = {};
+            for (const course of validCourses) {
+              const currentCourseId = course.course_id || course.id || course.courseId;
+              try {
+                console.log(`🔍 [DEBUG] Solicitando módulos para el curso ID: ${currentCourseId}`);
+                const mods = await getCourseModules(session.access_token, currentCourseId);
+                
+                console.log(`🔍 [DEBUG] Módulos obtenidos para curso ${currentCourseId}:`, mods);
+                if (Array.isArray(mods)) {
+                  modulesMap[String(currentCourseId)] = mods.sort((a, b) => a.module_order - b.module_order);
+                }
+              } catch (modErr) {
+                console.error(`Error cargando módulos del curso ${currentCourseId}:`, modErr);
+              }
+            }
+            setCourseModulesMap(modulesMap);
+          }
+
         } catch (gapErr) {
           console.warn("No se pudieron cargar brecha y roadmap:", gapErr);
           setGap({ target_role: null, mastered: [], partial: [], missing: [], coverage: 0 });
           setRoadmap([]);
-          setAnalysisFailed(true);
         }
       } catch (err: any) {
         console.error("Error al conectar con el backend:", err);
@@ -197,12 +260,46 @@ const DEFAULT_SKILLS = [
     loadAllData();
   }, [session, router, save]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
-    localStorage.removeItem("access_token");
-    clear();
-    router.push("/login");
+  // Alternar expansión del curso para ver sus módulos
+  const toggleCourseExpand = async (courseId: string | number) => {
+    const idStr = String(courseId);
+    const isCurrentlyExpanded = !!expandedCourses[idStr];
+    
+    setExpandedCourses(prev => ({ ...prev, [idStr]: !isCurrentlyExpanded }));
+
+    // Si no tenemos sus módulos cargados aún, los pedimos
+    if (!isCurrentlyExpanded && !courseModulesMap[idStr] && session) {
+      try {
+        setLoadingModulesId(idStr);
+        const mods = await getCourseModules(session.access_token, Number(courseId));
+        if (Array.isArray(mods)) {
+          setCourseModulesMap(prev => ({
+            ...prev,
+            [idStr]: mods.sort((a, b) => a.module_order - b.module_order)
+          }));
+        }
+      } catch (e) {
+        console.error("Error al expandir módulos del curso:", e);
+      } finally {
+        setLoadingModulesId(null);
+      }
+    }
   };
+  const refreshModulesForCourse = async (courseId: string | number) => {
+  if (!session) return;
+  const idStr = String(courseId);
+  try {
+    const mods = await getCourseModules(session.access_token, Number(courseId));
+    if (Array.isArray(mods)) {
+      setCourseModulesMap(prev => ({
+        ...prev,
+        [idStr]: mods.sort((a, b) => a.module_order - b.module_order)
+      }));
+    }
+  } catch (e) {
+    console.error("Error al refrescar módulos:", e);
+  }
+};
 
   const loading = !hydrated || authLoading || loadingData;
 
@@ -238,14 +335,11 @@ const DEFAULT_SKILLS = [
   const partial: any[] = gap?.partial ?? [];
   const missing: any[] = gap?.missing ?? [];
   const progressPct = Math.round(coverage * 100);
-  const quote = pickQuote(profile.fullName || "", progressPct);
   const focusPhrase = pickFocusPhrase();
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">
       <section className="mb-6">
-        
-        {/* Cabecera externa: Saludo a la izquierda y Racha a la derecha */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-4 px-1">
           <div>
             <h1 className="font-display text-2xl font-bold md:text-3xl text-gray-900">
@@ -261,24 +355,17 @@ const DEFAULT_SKILLS = [
           </div>
         </div>
 
-        
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#6E43FF] via-[#8B5CF6] to-[#FF7A45] p-6 text-white shadow-glow md:p-8">
-          
-          
           <div className="absolute inset-0 pointer-events-none">
             <img
               src="/img/mountain-illustration.png"
               alt="Ilustración de progreso hacia la meta"
               className="absolute right-0 top-0 h-full w-full object-cover opacity-90"
             />
-           
             <div className="absolute inset-y-0 left-0 w-full md:w-1/2 bg-gradient-to-r from-[#5B2FE0]/90 via-[#6E43FF]/60 to-transparent"></div>
           </div>
 
-        
           <div className="relative z-10 grid gap-6 md:grid-cols-[280px_1fr_auto] items-center">
-            
-          
             <div className="min-w-0">
               <p className="text-sm font-medium text-white/90">Tu progreso general</p>
               <p className="mt-1 font-display text-5xl md:text-6xl font-bold tracking-tight">{progressPct}%</p>
@@ -297,24 +384,19 @@ const DEFAULT_SKILLS = [
               </Link>
             </div>
 
-          
             <div className="hidden md:block"></div>
 
-            
             <div className="flex justify-center md:justify-end">
               <div className="w-full sm:w-72 rounded-2xl bg-white p-4 text-gray-900 shadow-xl backdrop-blur-md">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold text-gray-800">⚙️ Enfoque de hoy</p>
                   <span className="text-gray-400 font-bold tracking-widest text-xs">•••</span>
                 </div>
-                
                 <p className="mt-1.5 text-xs text-gray-600">{focusPhrase}</p>
               </div>
             </div>
-
           </div>
         </div>
-
       </section>
 
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -333,9 +415,8 @@ const DEFAULT_SKILLS = [
         </div>
       </header>
 
-    
       <div className="grid gap-4 md:grid-cols-4">
-        <StatCard label="Cobertura del rol" value={`${progressPct}%`} hint={`${mastered.length}/${target.core_skill_slugs?.length ?? target.coreSkills?.length ?? 0} skills clave dominadas`} />
+        <StatCard label="Cobertura del rol" value={`${progressPct}%`} hint={`${mastered.length}/${target.core_skill_slugs?.length ?? 0} skills clave dominadas`} />
         <StatCard label="Skills por aprender" value={String(missing.length)} hint="Priorizadas por demanda" />
         <StatCard label="Horas estimadas" value={`${totalHours}h`} hint="Roadmap completo" />
         <StatCard label="Ofertas analizadas" value={String(jobs.length)} hint="Mercado peruano" />
@@ -354,8 +435,171 @@ const DEFAULT_SKILLS = [
         </div>
       </section>
 
+      {/* SECCIÓN: MIS CURSOS (ESTRICTAMENTE INSCRITOS EN user_skill_courses) */}
+      <section className="surface-card mt-6 p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="font-display text-lg font-semibold text-on-surface">Mis Cursos Activos</h2>
+            <p className="text-sm text-on-surface-variant">Despliega cada curso para ver sus módulos y realizar las evaluaciones correspondientes.</p>
+          </div>
+          <Link href="/cursos" className="text-sm font-medium text-primary hover:underline">
+            Explorar catálogo →
+          </Link>
+        </div>
+
+        {enrolledCourses.length > 0 ? (
+          <div className="grid gap-4">
+            {enrolledCourses.map((item: any, index: number) => {
+              const courseId = item.course_id || item.id;
+              const courseTitle = item.course_title || item.title || `Curso #${courseId}`;
+              const skillSlug = item.skill_slug;
+              const isExpanded = !!expandedCourses[String(courseId)];
+              const modulesList = courseModulesMap[String(courseId)] || [];
+              const isLoadingMods = loadingModulesId === String(courseId);
+
+              return (
+                <div key={courseId || index} className="rounded-2xl border border-outline-variant bg-white p-5 shadow-sm transition-all">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
+                          {skillSlug ? `Skill: ${skillSlug}` : "Inscrito"}
+                        </span>
+                      </div>
+                      <h3 className="font-display font-bold text-gray-900 text-base md:text-lg">{courseTitle}</h3>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => toggleCourseExpand(courseId)}
+                        className="gap-2 text-xs font-semibold"
+                      >
+                        {isExpanded ? "Ocultar Módulos" : "Ver Módulos y Tests"}
+                        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </Button>
+                      
+                      <Link
+                        href={`/courses/${courseId}/modules`}
+                        className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-medium text-white hover:bg-primary/80"
+                      >
+                        Ir al Curso <ArrowRight className="h-3 w-3" />
+                        
+                      </Link>
+                    </div>
+                  </div>
+
+                  {/* DESPLEGABLE DE MÓDULOS Y ESTADOS DE TESTS */}
+                  {isExpanded && (
+                    <div className="mt-5 pt-4 border-t border-gray-100">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
+                        Módulos de aprendizaje y evaluaciones
+                      </h4>
+
+                      {isLoadingMods ? (
+                        <div className="flex justify-center py-6">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        </div>
+                      ) : modulesList.length > 0 ? (
+                        <div className="space-y-2.5">
+                          {modulesList.map((mod: any, mIdx: number) => {
+                            const locked = isModuleLocked(modulesList, mIdx);
+                            const statusLabel = getModuleStatusLabel(mod);
+                            const statusStyle = getModuleStatusStyle(mod);
+
+                            return (
+                              <div
+                                key={mod.id || mIdx}
+                                className={`flex flex-wrap items-center justify-between gap-3 rounded-xl p-3.5 border ${
+                                  locked ? "bg-gray-50 border-gray-100 opacity-60" : "bg-surface-container-low border-outline-variant/60"
+                                }`}
+                              >
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white font-bold text-xs text-primary border border-gray-200">
+                                    {mIdx + 1}
+                                  </span>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-semibold text-gray-900 truncate">{mod.title || `Módulo ${mIdx + 1}`}</p>
+                                    {mod.content_summary && (
+                                        <p className="text-xs text-gray-500 whitespace-pre-line leading-relaxed mt-1">
+                                          {mod.content_summary}
+                                        </p>
+                                      )}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-3 shrink-0">
+                                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${statusStyle}`}>
+                                    {mod.passed && <CheckCircle2 className="h-3.5 w-3.5" />}
+                                    {statusLabel}
+                                    {mod.best_score !== null && mod.best_score !== undefined && mod.attempts > 0
+                                      ? ` · Mejor: ${Math.round(mod.best_score / 10)}/10`
+                                      : ""}
+                                  </span>
+
+                                  {locked ? (
+                                    <span className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-gray-200 px-3 text-xs font-medium text-gray-500">
+                                      <Lock className="h-3.5 w-3.5" /> Bloqueado
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => setActiveModuleId(mod.id)}
+                                      className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-colors shadow-sm ${
+                                        mod.passed
+                                          ? "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200"
+                                          : "bg-primary text-white hover:bg-primary/80"
+                                      }`}
+                                    >
+                                      <FileText className="h-3.5 w-3.5" />
+                                      {mod.passed ? "Volver a practicar" : mod.attempts > 0 ? "Reintentar" : "Hacer Test"}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-500 py-3 italic text-center">
+                          No hay módulos registrados para este curso todavía.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-outline-variant p-8 text-center bg-white">
+            <BookOpen className="mx-auto h-8 w-8 text-primary" />
+            <h3 className="mt-3 font-display font-semibold text-on-surface">No tienes cursos activos en este momento</h3>
+            <p className="mt-1 text-sm text-on-surface-variant">Explora el catálogo general de cursos o las recomendaciones de tu roadmap para inscribirte en tu primer curso.</p>
+            <Button className="mt-4">
+              <Link href="/cursos">Explorar Catálogo de Cursos</Link>
+            </Button>
+          </div>
+        )}
+      </section>
+
+      {/* RENDERIZADO DEL MODAL DE EVALUACIÓN (QUIZ MODAL) */}
+      {activeModuleId && (
+  <QuizModal
+    moduleId={activeModuleId}
+    onClose={() => setActiveModuleId(null)}
+    onComplete={() => {
+      const courseWithModule = enrolledCourses.find((c: any) =>
+        (courseModulesMap[String(c.course_id || c.id)] || []).some((m: any) => m.id === activeModuleId)
+      );
+      if (courseWithModule) {
+        refreshModulesForCourse(courseWithModule.course_id || courseWithModule.id);
+      }
+    }}
+  />
+)}
+
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
-  
         <section className="surface-card lg:col-span-2 p-6">
           <h2 className="font-display text-lg font-semibold text-on-surface">Top skills demandadas en el mercado</h2>
           <p className="mt-1 text-sm text-on-surface-variant">Frecuencia de aparición en ofertas analizadas.</p>
@@ -383,7 +627,6 @@ const DEFAULT_SKILLS = [
           </ul>
         </section>
 
-  
         <section className="surface-card p-6">
           <h2 className="font-display text-lg font-semibold text-on-surface">Próximos pasos</h2>
           <p className="mt-1 text-sm text-on-surface-variant">Empieza por lo más rentable.</p>
@@ -416,7 +659,6 @@ const DEFAULT_SKILLS = [
         </section>
       </div>
 
-
       <section className="surface-card mt-6 p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-display text-lg font-semibold text-on-surface">Ofertas recientes analizadas</h2>
@@ -433,7 +675,6 @@ const DEFAULT_SKILLS = [
                     <div className="text-sm text-on-surface-variant">{j.company} · {j.location}</div>
                   </div>
                   <Badge variant="secondary" className="text-white">{j.seniority}</Badge>
-                  
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {jobSkills.slice(0, 6).map((s: any) => (
@@ -457,28 +698,4 @@ function StatCard({ label, value, hint }: { label: string; value: string; hint: 
       <div className="mt-1 text-xs text-on-surface-variant">{hint}</div>
     </div>
   );
-}
-
-function pickQuote(name: string, progress: number): { text: string; emoji: string } {
-  const quotes = progress < 25
-    ? [
-        { text: "Cada experto empezó como principiante. Hoy es un gran día para dar el primer paso.", emoji: "🌱" },
-        { text: "La ruta está trazada. Un pequeño avance diario hace una gran diferencia en 6 meses.", emoji: "🚀" },
-      ]
-    : progress < 60
-    ? [
-        { text: "Vas por buen camino. Sigue practicando lo que ya sabes y suma nuevas skills sin prisa.", emoji: "⚡" },
-        { text: "El progreso invisible de hoy será el resultado visible de mañana.", emoji: "💪" },
-      ]
-    : progress < 90
-    ? [
-        { text: "Ya dominas la mayoría de habilidades clave. Es momento de mostrar tus proyectos.", emoji: "🔥" },
-        { text: "Estás muy cerca. Enfócate en las últimas piezas y prepara tu portafolio.", emoji: "🎯" },
-      ]
-    : [
-        { text: "¡Impresionante! Estás listo para postular a las mejores prácticas del mercado.", emoji: "🏆" },
-        { text: "Domina lo que ya sabes, actualiza tu CV y postula. El empleo tech te espera.", emoji: "✨" },
-      ];
-  const seed = (name.length + progress) % quotes.length;
-  return quotes[seed];
 }
