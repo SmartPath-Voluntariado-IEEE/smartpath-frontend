@@ -15,12 +15,20 @@ import {
   Star,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProfile } from "@/hooks/use-profile";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { getCatalogCourses, getCatalogSkills, getRoadmap, type CatalogCourse } from "@/services/api";
+import { 
+  getCatalogCourses, 
+  getCatalogSkills, 
+  getRoadmap, 
+  getDashboardCourseProgress, 
+  selectCourseForSkill, 
+  type CatalogCourse 
+} from "@/services/api";
 import { getSkillIcon } from "@/lib/skill-icon-map";
 
 type CatalogSkill = {
@@ -157,27 +165,46 @@ function CoursesContent() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Almacena los IDs de los cursos ya seleccionados
+  const [selectedCourseIds, setSelectedCourseIds] = useState<number[]>([]);
 
   useEffect(() => {
     setActiveSkill(requestedSkill);
   }, [requestedSkill]);
 
   useEffect(() => {
-    async function loadRelevantSkills() {
+    async function loadRelevantData() {
       if (!session) return;
       try {
         setLoading(true);
         setError(null);
-        const [skillsData, roadmapData] = await Promise.all([
+        
+        // Cargamos skills, roadmap y el progreso de cursos en paralelo
+        const [skillsData, roadmapData, courseProgressData] = await Promise.all([
           getCatalogSkills(),
           getRoadmap(session.access_token),
+          getDashboardCourseProgress(session.access_token),
         ]);
-        const roadmapSlugs = roadmapData.flatMap((roadmapLevel: { skills?: { skill_slug: string }[] }) =>
-          roadmapLevel.skills?.map((skill) => skill.skill_slug) ?? [],
+        
+        const roadmapSlugs = roadmapData.flatMap((roadmapLevel: any) =>
+          roadmapLevel.skills?.map((skill: any) => skill.skill_slug || skill.slug) ?? [],
         );
         const profileSlugs = profile?.skills.map((skill) => skill.skillId) ?? [];
         const relevantSlugs = new Set(roadmapSlugs.length > 0 ? roadmapSlugs : profileSlugs);
         const relevantSkills = skillsData.filter((skill: CatalogSkill) => relevantSlugs.has(skill.slug));
+
+        // Extraemos los IDs de los cursos ya seleccionados desde el resumen de progreso
+        const selectedIds: number[] = [];
+        if (Array.isArray(courseProgressData)) {
+          courseProgressData.forEach((item: any) => {
+            if (item.course_id !== null && item.course_id !== undefined) {
+              selectedIds.push(Number(item.course_id));
+            }
+          });
+        }
+        
+        setSelectedCourseIds(selectedIds);
 
         setSkills(relevantSkills);
         setActiveSkill((current) =>
@@ -186,14 +213,14 @@ function CoursesContent() {
             : relevantSkills[0]?.slug ?? null,
         );
       } catch (loadError) {
-        console.error("Error al cargar las habilidades del roadmap:", loadError);
+        console.error("Error al cargar los datos del roadmap:", loadError);
         setError("No pudimos cargar las habilidades de tu roadmap. Inténtalo nuevamente.");
       } finally {
         setLoading(false);
       }
     }
 
-    if (!authLoading) loadRelevantSkills();
+    if (!authLoading) loadRelevantData();
   }, [authLoading, profile?.skills, session]);
 
   useEffect(() => {
@@ -343,7 +370,22 @@ function CoursesContent() {
 
               {filteredCourses.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  {filteredCourses.map((course) => <CourseCard key={course.id} course={course} skills={skills} />)}
+                  {filteredCourses.map((course) => {
+                    const isSelected = selectedCourseIds.includes(Number(course.id));
+                    return (
+                      <CourseCard 
+                        key={course.id} 
+                        course={course} 
+                        skills={skills} 
+                        session={session}
+                        activeSkill={activeSkill}
+                        isSelected={isSelected}
+                        onSelectSuccess={(courseId) => {
+                          setSelectedCourseIds((prev) => [...prev, courseId]);
+                        }}
+                      />
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="rounded-2xl border border-dashed border-[#dcd6ef] bg-white px-6 py-14 text-center">
@@ -405,8 +447,24 @@ function FilterSelect({ label, value, onChange, options, values = options }: { l
   );
 }
 
-function CourseCard({ course, skills }: { course: CatalogCourse; skills: CatalogSkill[] }) {
+function CourseCard({ 
+  course, 
+  skills, 
+  session, 
+  activeSkill, 
+  isSelected, 
+  onSelectSuccess 
+}: { 
+  course: CatalogCourse; 
+  skills: CatalogSkill[]; 
+  session: any; 
+  activeSkill: string | null;
+  isSelected: boolean;
+  onSelectSuccess: (courseId: number) => void;
+}) {
   const skillNames = course.skill_slugs.map((slug) => skills.find((skill) => skill.slug === slug)?.name ?? slug).slice(0, 2);
+  const [loading, setLoading] = useState(false);
+  
   return (
     <article className="group flex min-h-[340px] flex-col overflow-hidden rounded-2xl border border-[#e8e5f0] bg-white shadow-[0_5px_22px_rgba(13,17,51,.06)] transition-transform hover:-translate-y-0.5 hover:shadow-highlight">
       <CourseImage course={course} />
@@ -426,11 +484,44 @@ function CourseCard({ course, skills }: { course: CatalogCourse; skills: Catalog
           <span>{course.language ? formatCourseValue(course.language) : "Idioma por confirmar"}</span>
           {course.rating !== null && course.rating !== undefined && <span className="inline-flex items-center gap-1 text-amber-600"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {course.rating.toFixed(1)}</span>}
         </div>
+        
+        {/* Botón reactivo */}
+        <Button
+          className={`mt-3 w-full text-white transition-all ${
+            isSelected 
+              ? "bg-emerald-600 hover:bg-emerald-700 cursor-default shadow-sm" 
+              : "gradient-brand hover:opacity-95"
+          }`}
+          disabled={isSelected || loading}
+          onClick={async () => {
+            if (!session || !activeSkill || isSelected) return;
+            try {
+              setLoading(true);
+              await selectCourseForSkill(session.access_token, activeSkill, Number(course.id));
+              onSelectSuccess(Number(course.id));
+              toast.success("Curso incluido en tu roadmap");
+            } catch (err) {
+              console.error("Error al vincular el curso:", err);
+              toast.error("No se pudo vincular el curso. Inténtalo de nuevo.");
+            } finally {
+              setLoading(false);
+            }
+          }}
+        >
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : isSelected ? (
+            "Curso incluido en tu roadmap"
+          ) : (
+            "Seleccionar para mi roadmap"
+          )}
+        </Button>
+
         {course.url ? (
-          <a href={course.url} target="_blank" rel="noreferrer" className="mt-3 inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-primary/30 text-sm font-semibold text-primary transition hover:border-primary hover:bg-primary hover:text-white">
+          <a href={course.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-primary/30 text-sm font-semibold text-primary transition hover:border-primary hover:bg-primary hover:text-white">
             Ver curso <ArrowRight className="h-4 w-4" />
           </a>
-        ) : <span className="mt-3 inline-flex h-9 items-center justify-center rounded-xl border border-[#e7e3ef] text-sm font-medium text-on-surface-variant">Enlace no disponible</span>}
+        ) : <span className="mt-2 inline-flex h-9 items-center justify-center rounded-xl border border-[#e7e3ef] text-sm font-medium text-on-surface-variant">Enlace no disponible</span>}
       </div>
     </article>
   );
