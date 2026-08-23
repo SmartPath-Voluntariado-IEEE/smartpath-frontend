@@ -23,6 +23,13 @@ import {
 
 const PAGE_SIZE = 12;
 
+// Los botones `variant="outline"` del kit base dependen de tokens de color
+// (`border-border`, `bg-background`) que este proyecto no define, así que
+// caen a un negro sin estilizar. Se sobreescribe con la paleta que ya usa
+// el resto de la app (mismo patrón que /cursos).
+const OUTLINE_BUTTON_CLASS =
+  "rounded-lg border-[#e1ddeb] bg-white font-medium text-text-primary hover:border-primary/50 hover:bg-surface-variant hover:text-primary";
+
 const SENIORITY_OPTIONS = [
   { value: "all", label: "Todos los niveles" },
   { value: "Practicante", label: "Practicante" },
@@ -176,10 +183,15 @@ export default function BolsaLaboralPage() {
                 value={searchText}
                 onChange={(event) => setSearchText(event.target.value)}
                 placeholder="Puesto, empresa o ciudad…"
-                className="pl-9"
+                className="rounded-lg border-[#e1ddeb] bg-white pl-9 text-text-primary placeholder:text-text-secondary focus-visible:border-primary focus-visible:ring-primary/15"
               />
             </div>
-            <Button type="submit" variant="outline" size="sm">
+            <Button
+              type="submit"
+              variant="outline"
+              size="sm"
+              className={OUTLINE_BUTTON_CLASS}
+            >
               Buscar
             </Button>
           </form>
@@ -188,12 +200,16 @@ export default function BolsaLaboralPage() {
             value={seniority}
             onValueChange={(value) => resetAnd(() => setSeniority(value ?? "all"))}
           >
-            <SelectTrigger className="w-[170px]">
+            <SelectTrigger className="w-[170px] rounded-lg border-[#e1ddeb] bg-white font-medium text-on-surface hover:border-primary/50 focus-visible:border-primary focus-visible:ring-primary/15">
               <SelectValue placeholder="Nivel" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="rounded-xl border border-[#e1ddeb] bg-white p-1.5 shadow-[0_12px_28px_rgba(57,31,134,.14)] ring-0">
               {SENIORITY_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
+                <SelectItem
+                  key={option.value}
+                  value={option.value}
+                  className="cursor-pointer rounded-lg px-2.5 py-2 text-on-surface data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary"
+                >
                   {option.label}
                 </SelectItem>
               ))}
@@ -204,12 +220,16 @@ export default function BolsaLaboralPage() {
             value={minMatch}
             onValueChange={(value) => resetAnd(() => setMinMatch(value ?? "0"))}
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[180px] rounded-lg border-[#e1ddeb] bg-white font-medium text-on-surface hover:border-primary/50 focus-visible:border-primary focus-visible:ring-primary/15">
               <SelectValue placeholder="Afinidad" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="rounded-xl border border-[#e1ddeb] bg-white p-1.5 shadow-[0_12px_28px_rgba(57,31,134,.14)] ring-0">
               {MATCH_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
+                <SelectItem
+                  key={option.value}
+                  value={option.value}
+                  className="cursor-pointer rounded-lg px-2.5 py-2 text-on-surface data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary"
+                >
                   {option.label}
                 </SelectItem>
               ))}
@@ -232,6 +252,7 @@ export default function BolsaLaboralPage() {
           <Button
             variant="ghost"
             size="sm"
+            className="text-text-secondary hover:bg-surface-variant hover:text-primary"
             onClick={() => load()}
             disabled={loading}
             title="Recargar"
@@ -273,7 +294,7 @@ export default function BolsaLaboralPage() {
             <Button
               variant="outline"
               size="sm"
-              className="mt-5"
+              className={`mt-5 ${OUTLINE_BUTTON_CLASS}`}
               onClick={() =>
                 resetAnd(() => {
                   setSeniority("all");
@@ -303,6 +324,7 @@ export default function BolsaLaboralPage() {
               <Button
                 variant="outline"
                 size="sm"
+                className={OUTLINE_BUTTON_CLASS}
                 disabled={page === 0 || loading}
                 onClick={() => setPage((current) => Math.max(0, current - 1))}
               >
@@ -316,6 +338,7 @@ export default function BolsaLaboralPage() {
               <Button
                 variant="outline"
                 size="sm"
+                className={OUTLINE_BUTTON_CLASS}
                 disabled={page >= totalPages - 1 || loading}
                 onClick={() => setPage((current) => current + 1)}
               >
