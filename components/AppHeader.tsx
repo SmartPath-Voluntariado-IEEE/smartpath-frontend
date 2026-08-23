@@ -21,7 +21,7 @@ export function AppHeader() {
   const isAuthed = hydrated && !!profile && !isLanding;
   const router = useRouter();
 
-  if (pathname === "/onboarding") {
+  if (pathname === "/" || pathname === "/landing" || pathname === "/onboarding") {
     return null;
   }
 

@@ -8,7 +8,7 @@ import { LandingKPIs } from "@/components/landing/kpis";
 import { LandingUserHistories } from "@/components/landing/userhistories";
 import { LandingCTA } from "@/components/landing/cta";
 
-export default function HomePage() {
+export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[#060718] text-white selection:bg-purple-500 selection:text-white font-sans">
       {/* 01. Hero Section */}

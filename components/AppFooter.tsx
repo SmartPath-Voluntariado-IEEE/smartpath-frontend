@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Mail, Phone, MapPin, Heart } from "lucide-react";
 
 const FacebookIcon = () => (
@@ -54,6 +55,10 @@ const SOCIALS = [
 ];
 
 export function AppFooter() {
+  const pathname = usePathname();
+  if (pathname === "/onboarding") {
+    return null;
+  }
   return (
     <footer className="bg-gradient-to-br from-[#0B0F2E] via-[#151B3D] to-[#1E1032] text-white">
       <div className="mx-auto max-w-7xl px-6 py-14">
