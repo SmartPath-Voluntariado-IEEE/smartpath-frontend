@@ -27,6 +27,52 @@
   --color-on-surface: #0D1133;
   --color-on-surface-variant: #6B7280;
 
+  /*
+   * Tokens semánticos que el kit base (components/ui/*, base-ui + shadcn)
+   * espera encontrar (border-input, bg-popover, ring-foreground, etc.).
+   * Nunca se definieron, así que esas utilidades caían a un negro sin
+   * estilizar en cualquier Select/Input/Button que no los sobreescribiera
+   * a mano — el bug de "bordes negros" que apareció en varias pestañas.
+   * Se mapean acá, una sola vez, a la paleta de marca que ya existe arriba.
+   *
+   * --color-accent NO se toca: ya está tomado por el naranja de marca
+   * (usado en RoadmapHeader), con un significado distinto al "accent" de
+   * shadcn (superficie de hover). Solo se agrega accent-foreground, que
+   * faltaba.
+   */
+  --color-border: #E5E7EB;
+  --color-input: #E1DDEB;
+  --color-ring: #6E43FF;
+  --color-foreground: #0D1133;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #0D1133;
+  --color-popover: #FFFFFF;
+  --color-popover-foreground: #0D1133;
+  --color-muted: #F3F0FF;
+  --color-muted-foreground: #6B7280;
+  --color-accent-foreground: #FFFFFF;
+  --color-destructive: #EF4444;
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary-foreground: #FFFFFF;
+
+  /*
+   * Restos de un sistema de tokens anterior (Material 3: outline-variant,
+   * surface-container-*, primary-container...) que Dashboard, Login,
+   * Onboarding, QuizModal y el layout raíz siguen usando, pero que
+   * desapareció de este archivo en algún momento sin migrar esos usos.
+   * Sin definición, esas mismas clases caían al mismo negro sin
+   * estilizar — es la otra mitad del bug de "bordes negros". Se mapean a
+   * la paleta de marca actual (no a los valores viejos de Material 3).
+   */
+  --color-outline-variant: #E5E7EB;
+  --color-surface-container-low: #F8FAFC;
+  --color-surface-container-high: #F3F0FF;
+  --color-surface-container-highest: #E9E3FF;
+  --color-primary-container: #F3F0FF;
+  --color-on-primary-container: #6E43FF;
+  --color-secondary-container: #E7ECFF;
+  --color-success-foreground: #00C48C;
+
   /* Brand Spacing Tokens */
   --spacing-brand-xs: 4px;
   --spacing-brand-base: 8px;
