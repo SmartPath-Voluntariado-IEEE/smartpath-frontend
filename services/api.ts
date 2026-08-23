@@ -186,6 +186,61 @@ export async function getCatalogJobs(): Promise<any> {
   return response.data;
 }
 
+// ============================================
+// MARKET & JOB MATCHING (HU-62)
+// ============================================
+
+export interface SkillDemandItem {
+  slug: string;
+  name: string;
+  category: string;
+  count: number;
+  frequency: number;
+}
+
+export interface SalaryRange {
+  min: number | null;
+  max: number | null;
+  avg: number | null;
+  count: number;
+}
+
+export interface MarketOverview {
+  total_jobs: number;
+  skill_demand: SkillDemandItem[];
+  salary_ranges: Record<string, SalaryRange>;
+  top_companies: string[];
+}
+
+export interface JobMatch {
+  job: {
+    id: number;
+    company: string | null;
+    position: string | null;
+    salary: number | null;
+    seniority: string | null;
+    description: string | null;
+    location: string | null;
+    posted_at: string | null;
+    skill_slugs: string[];
+  };
+  match_percentage: number;
+  matched_skills: string[];
+  missing_skills: string[];
+}
+
+export async function getMarketOverview(): Promise<MarketOverview> {
+  const response = await api.get("/market/overview");
+  return response.data;
+}
+
+export async function getUserJobMatches(token: string): Promise<JobMatch[]> {
+  const response = await api.get("/users/job-matches", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return response.data;
+}
+
 export interface CatalogCourse {
   id: number;
   platform: string | null;

@@ -8,56 +8,79 @@ import { useProfile } from "@/hooks/use-profile";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, BookOpen, ArrowRight, CheckCircle2, FileText, ChevronDown, ChevronUp, Lock } from "lucide-react";
+import { Loader2, BookOpen, ArrowRight, CheckCircle2, FileText, ChevronDown, ChevronUp, Lock, Building2, Clock, Zap, Sparkles } from "lucide-react";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { QuizModal } from "@/components/courses/QuizModal";
 import { DashboardAchievementsWidget } from "@/components/achievements/DashboardAchievementsWidget";
+import { getSkillIcon } from "@/lib/skill-icon-map";
 import {
   getBackendProfile,
   upsertBackendProfile,
   getGapAnalysis,
   getRoadmap,
-  getCatalogJobs,
-  getCatalogSkills,
   getCatalogRoles,
   isOnboardingComplete,
   getDashboardCourseProgress,
   getCourseModules,
+  getMarketOverview,
+  getUserJobMatches,
 } from "@/services/api";
+import type { MarketOverview, JobMatch } from "@/services/api";
 import { loadProfile, type UserProfile } from "@/lib/profile-store";
 
-function extractSkills(text: string, skills: any[]): string[] {
-  const lower = " " + text.toLowerCase() + " ";
-  const found = new Set<string>();
-  for (const s of skills) {
-    const names = [s.name, ...(s.aliases ?? [])];
-    for (const n of names) {
-      const needle = n.toLowerCase();
-      const re = new RegExp(`(^|[^a-z0-9\\+#\\.])${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9\\+#]|$)`, "i");
-      if (re.test(lower)) {
-        found.add(s.slug);
-        break;
-      }
+const COMPANY_LOGOS: Record<string, string> = {
+  bcp: "/img/companies/bcp.png",
+  "bcp digital": "/img/companies/bcp.png",
+  "banco de crédito": "/img/companies/bcp.png",
+  interbank: "/img/companies/interbank.png",
+  tiktok: "/img/companies/tiktok.png",
+  "ntt data": "/img/companies/ntt-data.png",
+  solera: "/img/companies/solera.png",
+  "solera holdings": "/img/companies/solera.png",
+  "solera holdings, llc.": "/img/companies/solera.png",
+  etraveli: "/img/companies/etraveli.png",
+  "etraveli group": "/img/companies/etraveli.png",
+  encora: "/img/companies/encora.png",
+  entel: "/img/companies/entel.png",
+  "entel perú": "/img/companies/entel.png",
+  claro: "/img/companies/claro.png",
+};
+
+function getCompanyLogo(companyName: string | null): string | null {
+  if (!companyName) return null;
+  const normalized = companyName.toLowerCase().trim();
+  for (const [key, logoPath] of Object.entries(COMPANY_LOGOS)) {
+    if (normalized.includes(key) || key.includes(normalized)) {
+      return logoPath;
     }
   }
-  return [...found];
+  return null;
 }
 
-function computeMarketSkillFrequency(jobs: any[], skills: any[]) {
-  const counts = new Map<string, number>();
-  for (const j of jobs) {
-    const text = `${j.position || ""} ${j.description || ""}`;
-    for (const slug of extractSkills(text, skills)) {
-      counts.set(slug, (counts.get(slug) ?? 0) + 1);
-    }
+function formatSalary(salary: number | null): string {
+  if (!salary) return "A convenir";
+  return `S/ ${salary.toLocaleString("es-PE")}`;
+}
+
+function getMatchColor(pct: number): string {
+  if (pct >= 70) return "bg-emerald-100 text-emerald-800";
+  if (pct >= 40) return "bg-amber-100 text-amber-800";
+  return "bg-red-100 text-red-800";
+}
+
+function getSeniorityColor(seniority: string | null): string {
+  switch (seniority) {
+    case "Practicante": return "bg-blue-100 text-blue-800";
+    case "Junior": return "bg-violet-100 text-violet-800";
+    case "Semi Senior": return "bg-orange-100 text-orange-800";
+    default: return "bg-gray-100 text-gray-800";
   }
-  const total = jobs.length;
-  return [...counts.entries()]
-    .map(([slug, count]) => {
-      const s = skills.find((x) => x.slug === slug)!;
-      return { skillId: slug, name: s.name, category: s.category, count, frequency: count / total };
-    })
-    .sort((a, b) => b.count - a.count);
+}
+
+function getCardBorderClass(pct: number): string {
+  if (pct >= 70) return "border-emerald-200/90 hover:border-emerald-300 hover:shadow-emerald-500/10";
+  if (pct >= 40) return "border-amber-200/90 hover:border-amber-300 hover:shadow-amber-500/10";
+  return "border-indigo-200/90 hover:border-indigo-300 hover:shadow-indigo-500/10";
 }
 
 const FOCUS_PHRASES = [
@@ -99,10 +122,10 @@ export default function DashboardPage() {
   
   const [gap, setGap] = useState<any>(null);
   const [roadmap, setRoadmap] = useState<any>(null);
-  const [jobs, setJobs] = useState<any[]>([]);
-  const [skills, setSkills] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
   const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
+  const [marketOverview, setMarketOverview] = useState<MarketOverview | null>(null);
+  const [jobMatches, setJobMatches] = useState<JobMatch[]>([]);
 
   // Estado para almacenar los módulos cargados de cada curso inscrito: { [courseId]: Module[] }
   const [courseModulesMap, setCourseModulesMap] = useState<Record<string, any[]>>({});
@@ -114,51 +137,18 @@ export default function DashboardPage() {
   // Estado para el QuizModal activo
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
 
-  const DEFAULT_ROLES = [
-    { id: "backend", label: "Backend Developer", core_skill_slugs: ["java", "springboot", "rest", "sql", "postgres", "docker", "git", "aws"] },
-    { id: "frontend", label: "Frontend Developer", core_skill_slugs: ["javascript", "typescript", "react", "nextjs", "tailwind", "git", "rest"] },
-    { id: "fullstack", label: "Full Stack Developer", core_skill_slugs: ["typescript", "react", "nodejs", "postgres", "git", "rest", "docker"] },
-    { id: "data-analyst", label: "Data Analyst", core_skill_slugs: ["sql", "excel", "powerbi", "python", "pandas", "english"] },
-    { id: "data-engineer", label: "Data Engineer", core_skill_slugs: ["python", "sql", "postgres", "docker", "linux", "gcp", "aws"] },
-    { id: "ml", label: "Machine Learning Engineer", core_skill_slugs: ["python", "pandas", "tensorflow", "sql", "docker", "aws", "english"] },
-    { id: "devops", label: "DevOps Engineer", core_skill_slugs: ["linux", "docker", "kubernetes", "aws", "git", "python"] }
-  ];
-
-  const DEFAULT_SKILLS = [
-    { id: 1, slug: "python", name: "Python", category: "language" },
-    { id: 2, slug: "javascript", name: "JavaScript", category: "language" },
-    { id: 3, slug: "typescript", name: "TypeScript", category: "language" },
-    { id: 4, slug: "java", name: "Java", category: "language" },
-    { id: 5, slug: "react", name: "React", category: "framework" },
-    { id: 6, slug: "nextjs", name: "Next.js", category: "framework" },
-    { id: 7, slug: "nodejs", name: "Node.js", category: "framework" },
-    { id: 8, slug: "springboot", name: "Spring Boot", category: "framework" },
-    { id: 9, slug: "docker", name: "Docker", category: "tool" },
-    { id: 10, slug: "sql", name: "SQL", category: "language" },
-    { id: 11, slug: "postgres", name: "PostgreSQL", category: "database" },
-    { id: 12, slug: "tailwind", name: "Tailwind CSS", category: "framework" },
-    { id: 13, slug: "aws", name: "AWS", category: "cloud" },
-    { id: 14, slug: "powerbi", name: "Power BI", category: "tool" },
-    { id: 15, slug: "pandas", name: "Pandas", category: "framework" },
-    { id: 16, slug: "linux", name: "Linux", category: "tool" },
-    { id: 17, slug: "git", name: "Git", category: "tool" },
-    { id: 18, slug: "rest", name: "REST APIs", category: "concept" }
-  ];
-
   useEffect(() => {
     if (!session) return;
 
     const loadAllData = async () => {
       try {
         setLoadingData(true);
-        const [jobsData, skillsData, rolesData] = await Promise.all([
-          getCatalogJobs().catch(() => []),
-          getCatalogSkills().catch(() => []),
-          getCatalogRoles().catch(() => [])
+        const [rolesData, marketData] = await Promise.all([
+          getCatalogRoles().catch(() => []),
+          getMarketOverview().catch(() => null),
         ]);
-        setJobs(jobsData || []);
-        setSkills(skillsData && skillsData.length > 0 ? skillsData : DEFAULT_SKILLS);
-        setRoles(rolesData && rolesData.length > 0 ? rolesData : DEFAULT_ROLES);
+        setRoles(rolesData && rolesData.length > 0 ? rolesData : []);
+        if (marketData) setMarketOverview(marketData);
 
         let profileData = await getBackendProfile(session.access_token).catch(() => null);
 
@@ -201,10 +191,11 @@ export default function DashboardPage() {
         save(mappedProfile);
         
         try {
-          const [gapData, roadmapData, courseProgressData] = await Promise.all([
+          const [gapData, roadmapData, courseProgressData, matchesData] = await Promise.all([
             getGapAnalysis(session.access_token),
             getRoadmap(session.access_token),
-            getDashboardCourseProgress(session.access_token).catch(() => [])
+            getDashboardCourseProgress(session.access_token).catch(() => []),
+            getUserJobMatches(session.access_token).catch(() => []),
           ]);
           
           // 🔍 DEBUG 1: Ver qué devuelve exactamente la API de cursos
@@ -212,6 +203,7 @@ export default function DashboardPage() {
 
           setGap(gapData);
           setRoadmap(roadmapData);
+          setJobMatches(Array.isArray(matchesData) ? matchesData : []);
           
           // Filtramos de forma flexible aceptando course_id o id
           const validCourses = Array.isArray(courseProgressData) 
@@ -326,7 +318,6 @@ export default function DashboardPage() {
   }
 
   const target = roles.find((r) => r.id === profile.targetRoleId) ?? roles[0];
-  const market = computeMarketSkillFrequency(jobs, skills);
   const levels: any[] = Array.isArray(roadmap) ? roadmap : [];
   const totalHours = levels.reduce(
     (acc: number, l: any) => acc + (l.skills ?? []).reduce((a: number, s: any) => a + (s.estHours ?? 0), 0),
@@ -338,6 +329,8 @@ export default function DashboardPage() {
   const missing: any[] = gap?.missing ?? [];
   const progressPct = Math.round(coverage * 100);
   const focusPhrase = pickFocusPhrase();
+  const skillDemand = marketOverview?.skill_demand ?? [];
+  const totalJobs = marketOverview?.total_jobs ?? 0;
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">
@@ -421,7 +414,7 @@ export default function DashboardPage() {
         <StatCard label="Cobertura del rol" value={`${progressPct}%`} hint={`${mastered.length}/${target.core_skill_slugs?.length ?? 0} skills clave dominadas`} />
         <StatCard label="Skills por aprender" value={String(missing.length)} hint="Priorizadas por demanda" />
         <StatCard label="Horas estimadas" value={`${totalHours}h`} hint="Roadmap completo" />
-        <StatCard label="Ofertas analizadas" value={String(jobs.length)} hint="Mercado peruano" />
+        <StatCard label="Ofertas analizadas" value={String(totalJobs)} hint="Mercado peruano" />
       </div>
 
       <section className="surface-card mt-6 p-6">
@@ -606,12 +599,12 @@ export default function DashboardPage() {
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <section className="surface-card lg:col-span-2 p-6">
           <h2 className="font-display text-lg font-semibold text-on-surface">Top skills demandadas en el mercado</h2>
-          <p className="mt-1 text-sm text-on-surface-variant">Frecuencia de aparición en ofertas analizadas.</p>
+          <p className="mt-1 text-sm text-on-surface-variant">Frecuencia de aparición en {totalJobs} ofertas analizadas.</p>
           <ul className="mt-5 space-y-3">
-            {market.slice(0, 10).map((s) => {
-              const userHas = profile.skills.some((us) => us.skillId === s.skillId);
+            {skillDemand.slice(0, 10).map((s) => {
+              const userHas = profile.skills.some((us) => us.skillId === s.slug);
               return (
-                <li key={s.skillId} className="flex items-center gap-4">
+                <li key={s.slug} className="flex items-center gap-4">
                   <div className="w-32 shrink-0 text-sm font-medium text-on-surface">{s.name}</div>
                   <div className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-surface-container-high">
                     <div
@@ -637,6 +630,8 @@ export default function DashboardPage() {
           <ol className="mt-4 space-y-3">
             {missing.slice(0, 5).map((m: any, i: number) => {
               const slug = m.skill_slug || m.skillId;
+              const demandItem = skillDemand.find((d) => d.slug === slug);
+              const demandPct = demandItem ? Math.round(demandItem.frequency * 100) : 0;
               return (
                 <li key={slug || i} className="flex items-start gap-3 rounded-lg border border-outline-variant p-3">
                   <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-white">
@@ -645,7 +640,7 @@ export default function DashboardPage() {
                   <div className="min-w-0 flex-1">
                     <div className="font-medium text-on-surface">{m.name}</div>
                     <div className="text-xs text-on-surface-variant">
-                      Demanda: {Math.round(m.marketFreq * 100)}%
+                      Demanda: {demandPct}%
                     </div>
                   </div>
                   <Link href={`/cursos?skill=${slug}`} className="inline-flex h-7 items-center justify-center rounded-md hover:bg-muted text-primary px-2.5 text-[0.8rem] font-medium">
@@ -664,32 +659,213 @@ export default function DashboardPage() {
       </div>
 
       <section className="surface-card mt-6 p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-lg font-semibold text-on-surface">Ofertas recientes analizadas</h2>
-          <span className="text-xs text-on-surface-variant">{jobs.length} totales</span>
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-display text-lg font-bold text-gray-900">Ofertas laborales — Tu compatibilidad & Plan de acción</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Evalúa tu nivel de encaje con el mercado y desbloquea oportunidades cerrando brechas clave.</p>
+          </div>
+          <span className="text-xs font-semibold px-3 py-1 rounded-full bg-gray-100 text-gray-700">
+            {totalJobs} ofertas analizadas
+          </span>
         </div>
-        <div className="grid gap-3 md:grid-cols-2">
-          {jobs.slice(0, 4).map((j: any) => {
-            const jobSkills = skills.filter((s) => new RegExp(`\\b${s.name}\\b`, "i").test(j.description || ""));
+
+        <div className="grid gap-5 md:grid-cols-2">
+          {jobMatches.slice(0, 6).map((jm) => {
+            const companyLogo = getCompanyLogo(jm.job.company);
+            const is100 = jm.match_percentage === 100;
+            const firstMissing = jm.missing_skills[0];
+            const estHours = jm.missing_skills.length * 6;
+
             return (
-              <div key={j.id} className="rounded-xl border border-outline-variant p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="font-semibold text-on-surface">{j.position}</div>
-                    <div className="text-sm text-on-surface-variant">{j.company} · {j.location}</div>
+              <div
+                key={jm.job.id}
+                className={`rounded-3xl border ${getCardBorderClass(jm.match_percentage)} bg-white p-5 md:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between`}
+              >
+                <div>
+                  {/* Cabecera: Empresa + Cargo + Seniority + Radial Gauge */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap mb-2">
+                        {companyLogo ? (
+                          <div className="relative group/logo flex items-center justify-center h-8 px-2.5 bg-gray-50 rounded-xl border border-gray-200/70 shrink-0 cursor-pointer">
+                            <img
+                              src={companyLogo}
+                              alt={jm.job.company || "Empresa"}
+                              className="h-4 max-w-[75px] object-contain rounded"
+                            />
+                            {/* Tooltip */}
+                            <div className="pointer-events-none absolute -top-8 left-0 z-30 hidden rounded-md bg-gray-900 px-2 py-1 text-[11px] font-semibold text-white shadow-md group-hover/logo:block whitespace-nowrap">
+                              {jm.job.company}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="inline-flex items-center gap-1.5 h-8 px-2.5 bg-gray-50 rounded-xl border border-gray-200/70 text-xs font-semibold text-gray-700">
+                            <Building2 className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                            <span>{jm.job.company || "Empresa confidencial"}</span>
+                          </div>
+                        )}
+                        {jm.job.location && (
+                          <span className="text-xs text-gray-400">· {jm.job.location}</span>
+                        )}
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${getSeniorityColor(jm.job.seniority)}`}>
+                          {jm.job.seniority || "Junior"}
+                        </span>
+                      </div>
+
+                      <h3 className="font-display font-bold text-gray-900 text-base md:text-lg leading-snug">
+                        {jm.job.position}
+                      </h3>
+                    </div>
+
+                    {/* Medidor Radial Gauge */}
+                    <MatchRadialGauge percentage={jm.match_percentage} />
                   </div>
-                  <Badge variant="secondary" className="text-white">{j.seniority}</Badge>
+
+                  {/* Línea de Compensación */}
+                  <div className="mt-3.5 flex items-center justify-between text-xs border-t border-gray-100 pt-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold uppercase tracking-wider text-gray-400">Salario:</span>
+                      <span className="font-extrabold text-gray-900 text-sm">{formatSalary(jm.job.salary)}</span>
+                      {jm.job.salary && <span className="text-gray-400 font-normal">/ mes</span>}
+                    </div>
+                    {is100 ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        <CheckCircle2 className="w-3 h-3" /> Perfil 100% listo
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-gray-500 font-medium">
+                        {jm.matched_skills.length} de {jm.job.skill_slugs.length} requisitos
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Desglose de Habilidades */}
+                  <div className="mt-3.5 space-y-2.5">
+                    {jm.matched_skills.length > 0 && (
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                          Dominadas ({jm.matched_skills.length})
+                        </span>
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {jm.matched_skills.map((slug) => (
+                            <span
+                              key={slug}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 text-emerald-700 px-2 py-0.5 text-xs font-medium border border-emerald-100"
+                            >
+                              <span className="shrink-0">{getSkillIcon(slug, 12)}</span>
+                              <span>✓ {slug}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {jm.missing_skills.length > 0 && (
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-red-600">
+                          Habilidades por cerrar ({jm.missing_skills.length})
+                        </span>
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {jm.missing_skills.slice(0, 4).map((slug) => (
+                            <span
+                              key={slug}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-red-50 text-red-600 px-2 py-0.5 text-xs font-medium border border-red-100"
+                            >
+                              <span className="shrink-0">{getSkillIcon(slug, 12)}</span>
+                              <span>✗ {slug}</span>
+                            </span>
+                          ))}
+                          {jm.missing_skills.length > 4 && (
+                            <span className="rounded-lg bg-gray-100 text-gray-500 px-2 py-0.5 text-xs font-medium">
+                              +{jm.missing_skills.length - 4} más
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {jobSkills.slice(0, 6).map((s: any) => (
-                    <span key={s.slug} className="rounded-md bg-surface-container-high text-on-surface-variant px-2 py-0.5 text-xs">{s.name}</span>
-                  ))}
+
+                {/* Footer con Acción & Estimación de Esfuerzo */}
+                <div className="mt-5 pt-3.5 border-t border-gray-100 flex items-center justify-between">
+                  {is100 ? (
+                    <span className="text-xs text-gray-500 font-medium flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-500" /> ¡Listo para postular!
+                    </span>
+                  ) : jm.missing_skills.length === 1 ? (
+                    <span className="text-xs text-gray-500 font-medium flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-amber-500" /> Solo 1 skill para 100%
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-500 font-medium flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-amber-500" /> Brecha: ~{estHours}h de estudio
+                    </span>
+                  )}
+
+                  {is100 ? (
+                    <Link
+                      href="/roadmap"
+                      className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-all"
+                    >
+                      Ver en Roadmap <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  ) : (
+                    <Link
+                      href={firstMissing ? `/cursos?skill=${firstMissing}` : "/cursos"}
+                      className="inline-flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3.5 py-1.5 rounded-xl text-xs font-bold border border-indigo-200/80 transition-all"
+                    >
+                      Cerrar Brecha <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
+        {jobMatches.length === 0 && (
+          <p className="mt-4 text-center text-sm text-on-surface-variant">Completa tu perfil de habilidades para ver tu compatibilidad con las ofertas del mercado.</p>
+        )}
       </section>
+    </div>
+  );
+}
+
+function MatchRadialGauge({ percentage }: { percentage: number }) {
+  const isHigh = percentage >= 70;
+  const isMid = percentage >= 40;
+  
+  const ringColor = isHigh ? "text-emerald-500" : isMid ? "text-amber-500" : "text-indigo-500";
+  const textColor = isHigh ? "text-emerald-600" : isMid ? "text-amber-600" : "text-indigo-600";
+  const labelColor = isHigh ? "text-emerald-500" : isMid ? "text-amber-500" : "text-indigo-500";
+
+  return (
+    <div className="relative flex items-center justify-center shrink-0 w-16 h-16">
+      <svg className="w-16 h-16 -rotate-90" viewBox="0 0 36 36">
+        <path
+          className="text-gray-100"
+          strokeWidth="3.5"
+          stroke="currentColor"
+          fill="none"
+          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+        />
+        <path
+          className={`${ringColor} transition-all duration-700`}
+          strokeDasharray={`${Math.min(100, Math.max(0, percentage))}, 100`}
+          strokeWidth="3.5"
+          strokeLinecap="round"
+          stroke="currentColor"
+          fill="none"
+          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+        />
+      </svg>
+      <div className="absolute flex flex-col items-center justify-center text-center select-none pointer-events-none">
+        <span className={`text-xs font-display font-extrabold ${textColor} leading-none`}>
+          {percentage}%
+        </span>
+        <span className={`text-[9px] font-bold ${labelColor} uppercase tracking-tighter mt-0.5`}>
+          MATCH
+        </span>
+      </div>
     </div>
   );
 }

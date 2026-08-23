@@ -1,5 +1,5 @@
 import React from "react";
-import { Code } from "lucide-react";
+import { Code, Terminal } from "lucide-react";
 import {
   Git,
   GitHubDark,
@@ -7,10 +7,18 @@ import {
   TypeScript,
   Python,
   Java,
+  CSharp,
+  CPlusPlus,
+  PHP,
   TailwindCSS,
   React as ReactIcon,
   NodeJs,
   NextJs,
+  Angular,
+  VueJs,
+  Django,
+  FastAPI,
+  Spring,
   MongoDB,
   MySQL,
   PostgreSQL,
@@ -24,6 +32,8 @@ import {
   Tensorflow,
   HTML5,
   CSS3,
+  Linux,
+  Bash,
 } from "developer-icons";
 
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
@@ -39,6 +49,11 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
   ts: TypeScript,
   python: Python,
   java: Java,
+  csharp: CSharp,
+  "c#": CSharp,
+  cpp: CPlusPlus,
+  "c++": CPlusPlus,
+  php: PHP,
   tailwind: TailwindCSS,
   tailwindcss: TailwindCSS,
   react: ReactIcon,
@@ -47,6 +62,13 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
   node: NodeJs,
   nextjs: NextJs,
   next: NextJs,
+  angular: Angular,
+  vue: VueJs,
+  vuejs: VueJs,
+  django: Django,
+  fastapi: FastAPI,
+  springboot: Spring,
+  spring: Spring,
   mongodb: MongoDB,
   mongo: MongoDB,
   mysql: MySQL,
@@ -62,15 +84,19 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
   googlecloud: GoogleCloud,
   azure: Azure,
   tensorflow: Tensorflow,
+  linux: Linux,
+  bash: Bash,
 };
 
-export function getSkillIcon(skillSlug: string, size: number = 28, className?: string): React.ReactNode {
-  const normalizedSlug = skillSlug.toLowerCase().trim();
-  const IconComponent = ICON_MAP[normalizedSlug];
+export function getSkillIcon(skillSlug: string, size: number = 14, className?: string): React.ReactNode {
+  const normalizedSlug = (skillSlug || "").toLowerCase().trim().replace(/[-_]/g, "");
+  
+  // Try direct match or stripped match
+  const IconComponent = ICON_MAP[skillSlug.toLowerCase()] || ICON_MAP[normalizedSlug];
 
   if (IconComponent) {
     return <IconComponent size={size} className={className} />;
   }
 
-  return <Code size={size} className={className || "text-primary"} />;
+  return <Terminal size={size} className={className || "opacity-70"} />;
 }
