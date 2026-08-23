@@ -334,3 +334,69 @@ export async function getDashboardCourseProgress(token: string): Promise<CourseP
   const response = await api.get("/dashboard/course-progress", getAuthHeader(token));
   return response.data;
 }
+
+// ============================================
+// LOGROS Y GAMIFICACIÓN
+// ============================================
+
+export interface ApiAchievement {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  icon_name: string;
+  badge_color: string;
+  criteria_type: string;
+  criteria_value: number;
+  xp_points: number;
+}
+
+export interface ApiUserAchievement {
+  achievement_id: string;
+  user_id: string;
+  title: string;
+  description: string;
+  category: string;
+  icon_name: string;
+  badge_color: string;
+  xp_points: number;
+  unlocked_at: string;
+  metadata: Record<string, any>;
+}
+
+export async function getCatalogAchievements(): Promise<ApiAchievement[]> {
+  const response = await api.get("/catalog/achievements");
+  return response.data;
+}
+
+export async function getUserAchievements(token: string): Promise<ApiUserAchievement[]> {
+  const response = await api.get("/users/achievements", getAuthHeader(token));
+  return response.data;
+}
+
+export async function unlockUserAchievement(
+  token: string,
+  achievementId: string,
+  metadata: Record<string, any> = {}
+): Promise<any> {
+  const response = await api.post(
+    "/users/achievements/unlock",
+    { achievement_id: achievementId, metadata },
+    getAuthHeader(token)
+  );
+  return response.data;
+}
+
+export async function syncUserAchievements(
+  token: string,
+  payload: {
+    passed_modules_count: number;
+    last_quiz_score?: number;
+    has_completed_course?: boolean;
+    level_1_completed?: boolean;
+    streak_days?: number;
+  }
+): Promise<ApiUserAchievement[]> {
+  const response = await api.post("/users/achievements/sync", payload, getAuthHeader(token));
+  return response.data;
+}
