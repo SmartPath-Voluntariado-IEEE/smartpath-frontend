@@ -455,3 +455,130 @@ export async function syncUserAchievements(
   const response = await api.post("/users/achievements/sync", payload, getAuthHeader(token));
   return response.data;
 }
+
+// ============================================
+// BOLSA LABORAL (HU-57 / HU-58)
+// ============================================
+
+/** Requisito no técnico extraído del aviso (HU-58). */
+export interface JobRequirementItem {
+  type: "experiencia" | "educacion" | "idioma" | "contrato" | "modalidad";
+  label: string;
+  value: string | number | null;
+}
+
+/** Oferta recolectada por scraping, con lo que HU-58 extrajo de ella. */
+export interface ScrapedJob {
+  id: number;
+  company: string | null;
+  position: string | null;
+  location: string | null;
+  description: string | null;
+  seniority: string | null;
+  posted_at: string | null;
+
+  source: string | null;
+  url: string | null;
+  is_remote: boolean | null;
+  job_type: string | null;
+  scraped_at: string | null;
+
+  salary: number | null;
+  salary_min: number | null;
+  salary_max: number | null;
+  salary_currency: string | null;
+  salary_interval: string | null;
+
+  skill_slugs: string[];
+  required_skills: string[];
+  desirable_skills: string[];
+  experience_years_min: number | null;
+  education_level: string | null;
+  english_required: boolean | null;
+  requirements: JobRequirementItem[];
+}
+
+export interface JobRecommendation {
+  job: ScrapedJob;
+  /** Puntaje final: combina alineación con la ruta y preparación actual. */
+  match_percentage: number;
+  /** Cuánto tiene que ver la oferta con la ruta elegida. */
+  alignment_percentage: number;
+  /** Cuánto de lo que la oferta exige ya domina el usuario. */
+  readiness_percentage: number;
+  matched_skills: string[];
+  missing_skills: string[];
+  /** Lo que falta y la ruta sí enseña: el puente entre roadmap y oferta. */
+  missing_from_route: string[];
+  route_skills: string[];
+  required_skills: string[];
+  desirable_skills: string[];
+  seniority_fit: boolean;
+}
+
+export interface JobRecommendationsResponse {
+  target_role_id: string;
+  target_role_label: string | null;
+  route_skills: string[];
+  user_skills: string[];
+  total: number;
+  results: JobRecommendation[];
+}
+
+export interface JobRecommendationFilters {
+  limit?: number;
+  offset?: number;
+  minMatch?: number;
+  seniority?: string;
+  remoteOnly?: boolean;
+  search?: string;
+}
+
+export async function getJobRecommendations(
+  token: string,
+  filters: JobRecommendationFilters = {}
+): Promise<JobRecommendationsResponse> {
+  const response = await api.get("/users/job-recommendations", {
+    headers: { Authorization: `Bearer ${token}` },
+    params: {
+      limit: filters.limit,
+      offset: filters.offset,
+      min_match: filters.minMatch,
+      seniority: filters.seniority || undefined,
+      remote_only: filters.remoteOnly || undefined,
+      search: filters.search || undefined,
+    },
+  });
+  return response.data;
+}
+
+export interface JobScrapeResult {
+  message: string;
+  search_terms: string[];
+  sites: string[];
+  collected: number;
+  saved: number;
+  errors: { search_term: string; error: string }[];
+  requirements?: { jobs_analyzed: number; relations_created: number } | null;
+}
+
+/**
+ * Dispara una recolección de ofertas (HU-57).
+ *
+ * Tarda minutos: el scraping consulta el portal término por término y con
+ * pausas entre ellos. Quien la llame debe usar un timeout amplio y avisar
+ * al usuario, no dejarlo mirando un spinner sin contexto.
+ */
+export async function collectJobs(
+  roles?: string[],
+  resultsWanted?: number
+): Promise<JobScrapeResult> {
+  const response = await api.post("/jobs/collect", null, {
+    params: {
+      roles: roles?.length ? roles.join(",") : undefined,
+      results_wanted: resultsWanted,
+    },
+    timeout: 15 * 60 * 1000,
+  });
+  return response.data;
+}
