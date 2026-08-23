@@ -184,7 +184,7 @@ function CoursesContent() {
         const [skillsData, roadmapData, courseProgressData] = await Promise.all([
           getCatalogSkills(),
           getRoadmap(session.access_token),
-          getDashboardCourseProgress(session.access_token),
+          getDashboardCourseProgress(session.access_token).catch(() => []),
         ]);
         
         const roadmapSlugs = roadmapData.flatMap((roadmapLevel: any) =>

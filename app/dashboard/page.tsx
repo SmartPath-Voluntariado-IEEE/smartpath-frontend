@@ -11,6 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { Loader2, BookOpen, ArrowRight, CheckCircle2, FileText, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { QuizModal } from "@/components/courses/QuizModal";
+import { DashboardAchievementsWidget } from "@/components/achievements/DashboardAchievementsWidget";
 import {
   getBackendProfile,
   upsertBackendProfile,
@@ -225,10 +226,11 @@ export default function DashboardPage() {
           if (validCourses.length > 0) {
             const modulesMap: Record<string, any[]> = {};
             for (const course of validCourses) {
-              const currentCourseId = course.course_id || course.id || course.courseId;
+              const currentCourseId = (course as any).course_id || (course as any).id || (course as any).courseId;
+              if (!currentCourseId) continue;
               try {
                 console.log(`🔍 [DEBUG] Solicitando módulos para el curso ID: ${currentCourseId}`);
-                const mods = await getCourseModules(session.access_token, currentCourseId);
+                const mods = await getCourseModules(session.access_token, Number(currentCourseId));
                 
                 console.log(`🔍 [DEBUG] Módulos obtenidos para curso ${currentCourseId}:`, mods);
                 if (Array.isArray(mods)) {
@@ -434,6 +436,8 @@ export default function DashboardPage() {
           <Badge variant="destructive">◯ {missing.length} por aprender</Badge>
         </div>
       </section>
+
+      <DashboardAchievementsWidget />
 
       {/* SECCIÓN: MIS CURSOS (ESTRICTAMENTE INSCRITOS EN user_skill_courses) */}
       <section className="surface-card mt-6 p-6">

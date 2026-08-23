@@ -27,14 +27,14 @@
   --color-on-surface: #0D1133;
   --color-on-surface-variant: #6B7280;
 
-  /* Spacing Scale (4px base) */
-  --spacing-xs: 4px;
-  --spacing-base: 8px;
-  --spacing-sm: 12px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
-  --spacing-xl: 32px;
-  --spacing-xxl: 48px;
+  /* Brand Spacing Tokens */
+  --spacing-brand-xs: 4px;
+  --spacing-brand-base: 8px;
+  --spacing-brand-sm: 12px;
+  --spacing-brand-md: 16px;
+  --spacing-brand-lg: 24px;
+  --spacing-brand-xl: 32px;
+  --spacing-brand-xxl: 48px;
   --spacing-container-max: 1200px;
 
   /* Radii Tokens (DESIGN.md Section 8) */
