@@ -190,51 +190,23 @@ export default function DashboardPage() {
         };
         save(mappedProfile);
         
-        try {
+                try {
           const [gapData, roadmapData, courseProgressData, matchesData] = await Promise.all([
             getGapAnalysis(session.access_token),
             getRoadmap(session.access_token),
             getDashboardCourseProgress(session.access_token).catch(() => []),
             getUserJobMatches(session.access_token).catch(() => []),
           ]);
-          
-          // 🔍 DEBUG 1: Ver qué devuelve exactamente la API de cursos
-          console.log("🔍 [DEBUG] courseProgressData recibido:", courseProgressData);
 
           setGap(gapData);
           setRoadmap(roadmapData);
           setJobMatches(Array.isArray(matchesData) ? matchesData : []);
-          
-          // Filtramos de forma flexible aceptando course_id o id
-          const validCourses = Array.isArray(courseProgressData) 
-            ? courseProgressData.filter((c: any) => c && (c.course_id || c.id)) 
+
+          const validCourses = Array.isArray(courseProgressData)
+            ? courseProgressData.filter((c: any) => c && (c.course_id || c.id))
             : [];
-          
-          console.log("🔍 [DEBUG] validCourses filtrados:", validCourses);
+
           setEnrolledCourses(validCourses);
-
-          // Precargamos los módulos para cada curso inscrito de manera automática
-          // Precargamos los módulos para cada curso inscrito de manera automática
-          if (validCourses.length > 0) {
-            const modulesMap: Record<string, any[]> = {};
-            for (const course of validCourses) {
-              const currentCourseId = (course as any).course_id || (course as any).id || (course as any).courseId;
-              if (!currentCourseId) continue;
-              try {
-                console.log(`🔍 [DEBUG] Solicitando módulos para el curso ID: ${currentCourseId}`);
-                const mods = await getCourseModules(session.access_token, Number(currentCourseId));
-                
-                console.log(`🔍 [DEBUG] Módulos obtenidos para curso ${currentCourseId}:`, mods);
-                if (Array.isArray(mods)) {
-                  modulesMap[String(currentCourseId)] = mods.sort((a, b) => a.module_order - b.module_order);
-                }
-              } catch (modErr) {
-                console.error(`Error cargando módulos del curso ${currentCourseId}:`, modErr);
-              }
-            }
-            setCourseModulesMap(modulesMap);
-          }
-
         } catch (gapErr) {
           console.warn("No se pudieron cargar brecha y roadmap:", gapErr);
           setGap({ target_role: null, mastered: [], partial: [], missing: [], coverage: 0 });
@@ -457,13 +429,30 @@ export default function DashboardPage() {
               return (
                 <div key={courseId || index} className="rounded-2xl border border-outline-variant bg-white p-5 shadow-sm transition-all">
                   <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div className="min-w-0 flex-1">
+                                        <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
                           {skillSlug ? `Skill: ${skillSlug}` : "Inscrito"}
                         </span>
                       </div>
                       <h3 className="font-display font-bold text-gray-900 text-base md:text-lg">{courseTitle}</h3>
+
+                      {item.progress && item.progress.total > 0 && (
+                        <div className="mt-2.5 max-w-xs">
+                          <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1">
+                            <span>Progreso del curso</span>
+                            <span className="font-semibold text-emerald-600">
+                              {item.progress.percentage}%
+                            </span>
+                          </div>
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+                            <div
+                              className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                              style={{ width: `${item.progress.percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-3">
