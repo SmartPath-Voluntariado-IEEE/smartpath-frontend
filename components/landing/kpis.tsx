@@ -124,7 +124,7 @@ export function LandingKPIs() {
 
                 {/* Conteo de menciones */}
                 <div className="w-12 sm:w-16 text-right font-display font-bold text-slate-700 text-xs sm:text-sm shrink-0">
-                  {skill.count.toLocaleString()}
+                  {skill.count.toLocaleString("en-US")}
                 </div>
 
               </div>

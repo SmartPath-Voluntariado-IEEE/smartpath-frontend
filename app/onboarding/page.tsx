@@ -164,7 +164,7 @@ export default function OnboardingPage() {
   const [roles, setRoles] = useState<any[]>([]);
 
   const token = session?.access_token as string | undefined;
-
+  const googleName = (session?.user?.user_metadata as any)?.full_name as string | undefined;
   useEffect(() => {
     if (!session) return;
     async function loadData() {
@@ -402,24 +402,25 @@ export default function OnboardingPage() {
         {/* Input area */}
         <div className="border-t border-outline-variant bg-surface-container-low p-4">
           <StepInput
-            step={step}
-            draft={draft}
-            options={options}
-            roles={roles}
-            skills={skills}
-            disabled={sending}
-            onName={submitName}
-            onCareer={submitCareer}
-            onStage={submitStage}
-            onInterests={submitInterests}
-            onTarget={submitTarget}
-            onSkills={submitSkills}
-            onExperience={submitExperience}
-            onLearning={submitLearning}
-            onAvailability={submitAvailability}
-            onGoal={submitGoal}
-            onConfirm={confirmAll}
-          />
+              step={step}
+              draft={draft}
+              options={options}
+              roles={roles}
+              skills={skills}
+              disabled={sending}
+              googleName={googleName}
+              onName={submitName}
+              onCareer={submitCareer}
+              onStage={submitStage}
+              onInterests={submitInterests}
+              onTarget={submitTarget}
+              onSkills={submitSkills}
+              onExperience={submitExperience}
+              onLearning={submitLearning}
+              onAvailability={submitAvailability}
+              onGoal={submitGoal}
+              onConfirm={confirmAll}
+            />
         </div>
       </div>
 
@@ -461,6 +462,7 @@ interface StepInputProps {
   roles: any[];
   skills: any[];
   disabled: boolean;
+  googleName?: string;
   onName: (v: string) => void;
   onCareer: (v: string) => void;
   onStage: (v: string) => void;
@@ -483,6 +485,15 @@ function StepInput(p: StepInputProps) {
         </div>
       );
     case "ask_name":
+  if (p.googleName) {
+    return (
+      <NameConfirmPicker
+        googleName={p.googleName}
+        disabled={p.disabled}
+        onSubmit={p.onName}
+      />
+    );
+  }
       return (
         <TextComposer
           placeholder="Tu nombre completo"
@@ -725,7 +736,48 @@ function TextComposer({
     </form>
   );
 }
+function NameConfirmPicker({
+  googleName,
+  disabled,
+  onSubmit,
+}: {
+  googleName: string;
+  disabled?: boolean;
+  onSubmit: (v: string) => void;
+}) {
+  const [wantsCustom, setWantsCustom] = useState(false);
 
+  if (wantsCustom) {
+    return (
+      <TextComposer
+        placeholder="Tu nombre completo"
+        disabled={disabled}
+        onSubmit={onSubmit}
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onSubmit(googleName)}
+        className="h-9 rounded-full border border-primary bg-primary px-4 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+      >
+        Sí, ese es mi nombre
+      </button>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setWantsCustom(true)}
+        className="h-9 rounded-full border border-outline-variant bg-white px-4 text-sm font-medium text-on-surface transition hover:border-primary hover:bg-primary/5 disabled:opacity-50"
+      >
+        No, prefiero otro
+      </button>
+    </div>
+  );
+}
 function MultiChip({
   options,
   initial,
