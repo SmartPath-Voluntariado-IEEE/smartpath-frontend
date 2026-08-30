@@ -7,6 +7,7 @@ export interface RoadmapSkill {
   priority: number;
   courseCount: number;
   freeCourseCount: number;
+  isMastered?: boolean;
 }
 
 export interface RoadmapLevel {
