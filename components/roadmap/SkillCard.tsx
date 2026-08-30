@@ -22,18 +22,27 @@ export function SkillCard({
   rank,
   accentColorHex,
 }: SkillCardProps) {
+  const isMastered = skill.isMastered || progressPercent === 100;
+  const effectivePercent = isMastered ? 100 : progressPercent;
   const freeCourses = skill.freeCourseCount ?? 0;
   const hasCourses = courseCount > 0;
 
   return (
-    <div className="surface-card relative flex w-full max-w-[200px] flex-col items-center justify-between p-4 transition-all duration-200 hover:shadow-highlight hover:-translate-y-0.5">
-      {/* La habilidad más prioritaria del nivel se marca explícitamente:
-          el orden por sí solo no comunica que hay una priorización detrás. */}
-      {rank === 0 && (
+    <div
+      className={`surface-card relative flex w-full max-w-[200px] flex-col items-center justify-between p-4 transition-all duration-200 hover:shadow-highlight hover:-translate-y-0.5 ${
+        isMastered ? "border-emerald-200/80 bg-emerald-50/20" : ""
+      }`}
+    >
+      {/* Badge de estado */}
+      {isMastered ? (
+        <span className="absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+          ✓ Dominada
+        </span>
+      ) : rank === 0 ? (
         <span className="absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
           Empieza por aquí
         </span>
-      )}
+      ) : null}
 
       {/* Skill Title */}
       <h4 className="mb-3 mt-1 text-center text-sm font-semibold text-text-primary line-clamp-1">
@@ -42,7 +51,10 @@ export function SkillCard({
 
       {/* Progress Ring with Icon */}
       <div className="my-1 flex items-center justify-center">
-        <SkillProgressRing percent={progressPercent} ringColorHex={accentColorHex}>
+        <SkillProgressRing
+          percent={effectivePercent}
+          ringColorHex={isMastered ? "#10B981" : accentColorHex}
+        >
           {getSkillIcon(skill.skill_slug, 32)}
         </SkillProgressRing>
       </div>
@@ -61,13 +73,21 @@ export function SkillCard({
         <Link
           href={`/cursos?skill=${skill.skill_slug}`}
           className={`inline-flex w-full items-center justify-center rounded-[10px] px-3 py-1.5 text-xs font-semibold border transition-colors ${
-            hasCourses
-              ? "bg-white text-primary border-border-light hover:bg-surface-variant"
-              : "pointer-events-none border-border-light bg-surface-dim text-text-secondary opacity-60"
+            isMastered
+              ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+              : hasCourses
+                ? "bg-white text-primary border-border-light hover:bg-surface-variant"
+                : "pointer-events-none border-border-light bg-surface-dim text-text-secondary opacity-60"
           }`}
-          aria-disabled={!hasCourses}
+          aria-disabled={!hasCourses && !isMastered}
         >
-          {hasCourses ? "Ver cursos" : "Sin cursos"}
+          {isMastered
+            ? hasCourses
+              ? "Repasar cursos"
+              : "Dominada"
+            : hasCourses
+              ? "Ver cursos"
+              : "Sin cursos"}
         </Link>
       </div>
     </div>

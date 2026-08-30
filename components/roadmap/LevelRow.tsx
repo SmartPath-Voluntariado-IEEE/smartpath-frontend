@@ -97,15 +97,19 @@ export function LevelRow({
               <h3 className="font-display text-lg font-bold text-text-primary md:text-xl">
                 {level.label}
               </h3>
-              {isCurrentLevel && (
+              {levelProgressPercent === 100 ? (
+                <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+                  ✓ Completado
+                </Badge>
+              ) : isCurrentLevel ? (
                 <Badge className="bg-surface-variant text-primary border border-primary/20 font-semibold">
                   Actual
                 </Badge>
-              )}
+              ) : null}
               {/* El roadmap no se recorta al plazo del usuario: se marca
                   desde dónde deja de caber, y él decide si amplía el plazo
                   o sube sus horas semanales. */}
-              {level.withinTarget === false && (
+              {level.withinTarget === false && levelProgressPercent < 100 && (
                 <Badge className="border border-amber-200 bg-amber-50 font-semibold text-amber-700 hover:bg-amber-50">
                   Fuera de tu plazo
                 </Badge>
