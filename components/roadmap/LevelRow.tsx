@@ -13,6 +13,7 @@ interface LevelRowProps {
   isCurrentLevel: boolean;
   gap: GapAnalysis;
   courses: any[];
+  skillProgress?: Record<string, { percent: number }>;
   defaultExpanded?: boolean;
 }
 
@@ -42,6 +43,7 @@ export function LevelRow({
   isCurrentLevel,
   gap,
   courses,
+  skillProgress = {},
   defaultExpanded = true,
 }: LevelRowProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -51,6 +53,12 @@ export function LevelRow({
 
   // Calculate skill progress percentages
   const getSkillPercent = (slug: string): number => {
+    // Si hay progreso real de curso (backend: nivel declarado + módulos
+    // aprobados), úsalo — es más preciso que el nivel fijo del gap.
+    if (skillProgress[slug]) {
+      return Math.round(skillProgress[slug].percent);
+    }
+
     const isMastered = gap.mastered.some((s) => s.skill_slug === slug);
     if (isMastered) return 100;
 
