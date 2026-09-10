@@ -582,3 +582,19 @@ export async function collectJobs(
   });
   return response.data;
 }
+export interface SkillProgress {
+  percent: number;
+  course_linked: boolean;
+  modules_completed: number;
+  modules_total: number;
+}
+
+export async function getUserSkillProgress(token: string): Promise<Record<string, SkillProgress>> {
+  const response = await api.get("/users/skill-progress", getAuthHeader(token));
+  return response.data;
+}
+
+export async function getCourseDetail(courseId: number): Promise<CatalogCourse> {
+  const response = await api.get(`/courses/${courseId}`);
+  return response.data;
+}

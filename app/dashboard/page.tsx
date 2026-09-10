@@ -8,9 +8,8 @@ import { useProfile } from "@/hooks/use-profile";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, BookOpen, ArrowRight, CheckCircle2, FileText, ChevronDown, ChevronUp, Lock, Building2, Clock, Zap, Sparkles } from "lucide-react";
+import { Loader2, BookOpen, ArrowRight, CheckCircle2, Building2, Clock, Zap, Sparkles } from "lucide-react";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { QuizModal } from "@/components/courses/QuizModal";
 import { DashboardAchievementsWidget } from "@/components/achievements/DashboardAchievementsWidget";
 import { getSkillIcon } from "@/lib/skill-icon-map";
 import {
@@ -21,7 +20,6 @@ import {
   getCatalogRoles,
   isOnboardingComplete,
   getDashboardCourseProgress,
-  getCourseModules,
   getMarketOverview,
   getUserJobMatches,
 } from "@/services/api";
@@ -62,12 +60,6 @@ function formatSalary(salary: number | null): string {
   return `S/ ${salary.toLocaleString("es-PE")}`;
 }
 
-function getMatchColor(pct: number): string {
-  if (pct >= 70) return "bg-emerald-100 text-emerald-800";
-  if (pct >= 40) return "bg-amber-100 text-amber-800";
-  return "bg-red-100 text-red-800";
-}
-
 function getSeniorityColor(seniority: string | null): string {
   switch (seniority) {
     case "Practicante": return "bg-blue-100 text-blue-800";
@@ -97,22 +89,6 @@ const FOCUS_PHRASES = [
 function pickFocusPhrase(): string {
   return FOCUS_PHRASES[Math.floor(Math.random() * FOCUS_PHRASES.length)];
 }
-function getModuleStatusLabel(mod: any): string {
-  if (mod.attempts === 0) return "Módulo pendiente";
-  if (mod.passed) return "Módulo completado";
-  return "Falta validar";
-}
-
-function getModuleStatusStyle(mod: any): string {
-  if (mod.attempts === 0) return "bg-gray-100 text-gray-600";
-  if (mod.passed) return "bg-emerald-50 text-emerald-700";
-  return "bg-amber-50 text-amber-700";
-}
-
-function isModuleLocked(modulesList: any[], index: number): boolean {
-  if (index === 0) return false;
-  return !modulesList[index - 1]?.passed;
-}
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -126,16 +102,6 @@ export default function DashboardPage() {
   const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
   const [marketOverview, setMarketOverview] = useState<MarketOverview | null>(null);
   const [jobMatches, setJobMatches] = useState<JobMatch[]>([]);
-
-  // Estado para almacenar los módulos cargados de cada curso inscrito: { [courseId]: Module[] }
-  const [courseModulesMap, setCourseModulesMap] = useState<Record<string, any[]>>({});
-  const [loadingModulesId, setLoadingModulesId] = useState<string | null>(null);
-  
-  // Estado para expandir o contraer las tarjetas de cursos en el dashboard
-  const [expandedCourses, setExpandedCourses] = useState<Record<string, boolean>>({});
-
-  // Estado para el QuizModal activo
-  const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session) return;
@@ -190,7 +156,7 @@ export default function DashboardPage() {
         };
         save(mappedProfile);
         
-                try {
+        try {
           const [gapData, roadmapData, courseProgressData, matchesData] = await Promise.all([
             getGapAnalysis(session.access_token),
             getRoadmap(session.access_token),
@@ -225,47 +191,6 @@ export default function DashboardPage() {
 
     loadAllData();
   }, [session, router, save]);
-
-  // Alternar expansión del curso para ver sus módulos
-  const toggleCourseExpand = async (courseId: string | number) => {
-    const idStr = String(courseId);
-    const isCurrentlyExpanded = !!expandedCourses[idStr];
-    
-    setExpandedCourses(prev => ({ ...prev, [idStr]: !isCurrentlyExpanded }));
-
-    // Si no tenemos sus módulos cargados aún, los pedimos
-    if (!isCurrentlyExpanded && !courseModulesMap[idStr] && session) {
-      try {
-        setLoadingModulesId(idStr);
-        const mods = await getCourseModules(session.access_token, Number(courseId));
-        if (Array.isArray(mods)) {
-          setCourseModulesMap(prev => ({
-            ...prev,
-            [idStr]: mods.sort((a, b) => a.module_order - b.module_order)
-          }));
-        }
-      } catch (e) {
-        console.error("Error al expandir módulos del curso:", e);
-      } finally {
-        setLoadingModulesId(null);
-      }
-    }
-  };
-  const refreshModulesForCourse = async (courseId: string | number) => {
-  if (!session) return;
-  const idStr = String(courseId);
-  try {
-    const mods = await getCourseModules(session.access_token, Number(courseId));
-    if (Array.isArray(mods)) {
-      setCourseModulesMap(prev => ({
-        ...prev,
-        [idStr]: mods.sort((a, b) => a.module_order - b.module_order)
-      }));
-    }
-  } catch (e) {
-    console.error("Error al refrescar módulos:", e);
-  }
-};
 
   const loading = !hydrated || authLoading || loadingData;
 
@@ -409,7 +334,7 @@ export default function DashboardPage() {
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="font-display text-lg font-semibold text-on-surface">Mis Cursos Activos</h2>
-            <p className="text-sm text-on-surface-variant">Despliega cada curso para ver sus módulos y realizar las evaluaciones correspondientes.</p>
+            <p className="text-sm text-on-surface-variant">Continúa donde lo dejaste en cada curso.</p>
           </div>
           <Link href="/cursos" className="text-sm font-medium text-primary hover:underline">
             Explorar catálogo →
@@ -422,14 +347,11 @@ export default function DashboardPage() {
               const courseId = item.course_id || item.id;
               const courseTitle = item.course_title || item.title || `Curso #${courseId}`;
               const skillSlug = item.skill_slug;
-              const isExpanded = !!expandedCourses[String(courseId)];
-              const modulesList = courseModulesMap[String(courseId)] || [];
-              const isLoadingMods = loadingModulesId === String(courseId);
 
               return (
                 <div key={courseId || index} className="rounded-2xl border border-outline-variant bg-white p-5 shadow-sm transition-all">
                   <div className="flex flex-wrap items-center justify-between gap-4">
-                                        <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
                           {skillSlug ? `Skill: ${skillSlug}` : "Inscrito"}
@@ -455,104 +377,13 @@ export default function DashboardPage() {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => toggleCourseExpand(courseId)}
-                        className="gap-2 text-xs font-semibold"
-                      >
-                        {isExpanded ? "Ocultar Módulos" : "Ver Módulos y Tests"}
-                        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      </Button>
-                      
-                      <Link
-                        href={`/courses/${courseId}/modules`}
-                        className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-medium text-white hover:bg-primary/80"
-                      >
-                        Ir al Curso <ArrowRight className="h-3 w-3" />
-                        
-                      </Link>
-                    </div>
+                    <Link
+                      href={`/courses/${courseId}/modules`}
+                      className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-white hover:bg-primary/80 shrink-0"
+                    >
+                      Ir al Curso <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
                   </div>
-
-                  {/* DESPLEGABLE DE MÓDULOS Y ESTADOS DE TESTS */}
-                  {isExpanded && (
-                    <div className="mt-5 pt-4 border-t border-gray-100">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
-                        Módulos de aprendizaje y evaluaciones
-                      </h4>
-
-                      {isLoadingMods ? (
-                        <div className="flex justify-center py-6">
-                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                        </div>
-                      ) : modulesList.length > 0 ? (
-                        <div className="space-y-2.5">
-                          {modulesList.map((mod: any, mIdx: number) => {
-                            const locked = isModuleLocked(modulesList, mIdx);
-                            const statusLabel = getModuleStatusLabel(mod);
-                            const statusStyle = getModuleStatusStyle(mod);
-
-                            return (
-                              <div
-                                key={mod.id || mIdx}
-                                className={`flex flex-wrap items-center justify-between gap-3 rounded-xl p-3.5 border ${
-                                  locked ? "bg-gray-50 border-gray-100 opacity-60" : "bg-surface-container-low border-outline-variant/60"
-                                }`}
-                              >
-                                <div className="flex items-center gap-3 min-w-0 flex-1">
-                                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white font-bold text-xs text-primary border border-gray-200">
-                                    {mIdx + 1}
-                                  </span>
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-semibold text-gray-900 truncate">{mod.title || `Módulo ${mIdx + 1}`}</p>
-                                    {mod.content_summary && (
-                                        <p className="text-xs text-gray-500 whitespace-pre-line leading-relaxed mt-1">
-                                          {mod.content_summary}
-                                        </p>
-                                      )}
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center gap-3 shrink-0">
-                                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${statusStyle}`}>
-                                    {mod.passed && <CheckCircle2 className="h-3.5 w-3.5" />}
-                                    {statusLabel}
-                                    {mod.best_score !== null && mod.best_score !== undefined && mod.attempts > 0
-                                      ? ` · Mejor: ${Math.round(mod.best_score / 10)}/10`
-                                      : ""}
-                                  </span>
-
-                                  {locked ? (
-                                    <span className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-gray-200 px-3 text-xs font-medium text-gray-500">
-                                      <Lock className="h-3.5 w-3.5" /> Bloqueado
-                                    </span>
-                                  ) : (
-                                    <button
-                                      onClick={() => setActiveModuleId(mod.id)}
-                                      className={`inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-colors shadow-sm ${
-                                        mod.passed
-                                          ? "bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200"
-                                          : "bg-primary text-white hover:bg-primary/80"
-                                      }`}
-                                    >
-                                      <FileText className="h-3.5 w-3.5" />
-                                      {mod.passed ? "Volver a practicar" : mod.attempts > 0 ? "Reintentar" : "Hacer Test"}
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-gray-500 py-3 italic text-center">
-                          No hay módulos registrados para este curso todavía.
-                        </p>
-                      )}
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -568,22 +399,6 @@ export default function DashboardPage() {
           </div>
         )}
       </section>
-
-      {/* RENDERIZADO DEL MODAL DE EVALUACIÓN (QUIZ MODAL) */}
-      {activeModuleId && (
-  <QuizModal
-    moduleId={activeModuleId}
-    onClose={() => setActiveModuleId(null)}
-    onComplete={() => {
-      const courseWithModule = enrolledCourses.find((c: any) =>
-        (courseModulesMap[String(c.course_id || c.id)] || []).some((m: any) => m.id === activeModuleId)
-      );
-      if (courseWithModule) {
-        refreshModulesForCourse(courseWithModule.course_id || courseWithModule.id);
-      }
-    }}
-  />
-)}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <section className="surface-card lg:col-span-2 p-6">
@@ -671,7 +486,6 @@ export default function DashboardPage() {
                 className={`rounded-3xl border ${getCardBorderClass(jm.match_percentage)} bg-white p-5 md:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between`}
               >
                 <div>
-                  {/* Cabecera: Empresa + Cargo + Seniority + Radial Gauge */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -682,7 +496,6 @@ export default function DashboardPage() {
                               alt={jm.job.company || "Empresa"}
                               className="h-4 max-w-[75px] object-contain rounded"
                             />
-                            {/* Tooltip */}
                             <div className="pointer-events-none absolute -top-8 left-0 z-30 hidden rounded-md bg-gray-900 px-2 py-1 text-[11px] font-semibold text-white shadow-md group-hover/logo:block whitespace-nowrap">
                               {jm.job.company}
                             </div>
@@ -706,11 +519,9 @@ export default function DashboardPage() {
                       </h3>
                     </div>
 
-                    {/* Medidor Radial Gauge */}
                     <MatchRadialGauge percentage={jm.match_percentage} />
                   </div>
 
-                  {/* Línea de Compensación */}
                   <div className="mt-3.5 flex items-center justify-between text-xs border-t border-gray-100 pt-3">
                     <div className="flex items-center gap-1.5">
                       <span className="font-semibold uppercase tracking-wider text-gray-400">Salario:</span>
@@ -728,7 +539,6 @@ export default function DashboardPage() {
                     )}
                   </div>
 
-                  {/* Desglose de Habilidades */}
                   <div className="mt-3.5 space-y-2.5">
                     {jm.matched_skills.length > 0 && (
                       <div>
@@ -775,7 +585,6 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Footer con Acción & Estimación de Esfuerzo */}
                 <div className="mt-5 pt-3.5 border-t border-gray-100 flex items-center justify-between">
                   {is100 ? (
                     <span className="text-xs text-gray-500 font-medium flex items-center gap-1.5">

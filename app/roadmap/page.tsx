@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { useProfile } from "@/hooks/use-profile";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { getGapAnalysis, getRoadmap, getCatalogRoles, getCatalogCourses } from "@/services/api";
+import { getGapAnalysis, getRoadmap, getCatalogRoles, getCatalogCourses, getUserSkillProgress } from "@/services/api";
 import { RoadmapHeader } from "@/components/roadmap/RoadmapHeader";
 import { LevelRow } from "@/components/roadmap/LevelRow";
 import type { RoadmapLevel, GapAnalysis } from "@/types/roadmap";
@@ -19,22 +19,25 @@ export default function RoadmapPage() {
   const [roadmap, setRoadmap] = useState<RoadmapLevel[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
+  const [skillProgress, setSkillProgress] = useState<Record<string, any>>({});
 
   useEffect(() => {
     if (!session) return;
     const loadData = async () => {
       try {
         setLoadingData(true);
-        const [gapData, roadmapData, rolesData, coursesData] = await Promise.all([
+        const [gapData, roadmapData, rolesData, coursesData, progressData] = await Promise.all([
           getGapAnalysis(session.access_token),
           getRoadmap(session.access_token),
           getCatalogRoles(),
           getCatalogCourses(),
+          getUserSkillProgress(session.access_token).catch(() => ({})),
         ]);
         setGap(gapData);
         setRoadmap(roadmapData);
         setRoles(rolesData);
         setCourses(coursesData);
+        setSkillProgress(progressData);
       } catch (err) {
         console.error("Error al cargar datos del roadmap:", err);
       } finally {
@@ -86,7 +89,6 @@ export default function RoadmapPage() {
   const estimatedWeeks = Math.ceil(totalHours / weeklyHours);
   const estimatedMonths = Math.max(1, Math.ceil(estimatedWeeks / 4.33));
 
-  // Determine active level number (the first level with unmastered skills, default to level 1)
   const activeLevelObj = roadmap.find((lvl) => {
     return lvl.skills.some((s) => !gap.mastered.some((m) => m.skill_slug === s.skill_slug));
   }) || roadmap[0];
@@ -96,7 +98,6 @@ export default function RoadmapPage() {
 
   return (
     <div className="mx-auto max-w-[1200px] px-6 py-10">
-      {/* Roadmap Header with Title & KPI Cards */}
       <RoadmapHeader
         targetRoleLabel={targetRole.label}
         activeLevelNumber={activeLevelNumber}
@@ -104,14 +105,12 @@ export default function RoadmapPage() {
         estimatedMonths={targetMonths || estimatedMonths}
       />
 
-      {/* Section Title */}
       <div className="mb-6">
         <h2 className="font-display text-xl font-bold text-text-primary md:text-2xl">
           Ruta por niveles
         </h2>
       </div>
 
-      {/* Roadmap Levels List */}
       {roadmap.length === 0 ? (
         <div className="surface-card p-10 text-center bg-white">
           <h3 className="font-display text-xl font-bold text-text-primary">
@@ -132,6 +131,7 @@ export default function RoadmapPage() {
               isCurrentLevel={lvl.level === activeLevelNumber}
               gap={gap}
               courses={courses}
+              skillProgress={skillProgress}
               defaultExpanded={true}
             />
           ))}
