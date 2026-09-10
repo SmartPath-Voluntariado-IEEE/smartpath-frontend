@@ -348,7 +348,7 @@ export default function OnboardingPage() {
     pushBot(`🎉 ¡Perfecto! Hemos completado tu ruta para **${role.label}**. Redirigiendo a tu dashboard...`);
     setStep("done");
     toast.success(`Ruta lista para ${role.label}`);
-    setTimeout(() => router.push("/dashboard"), 1600);
+    setTimeout(() => router.push("/dashboard?tour=true"), 1600);
   }
 
   if (authLoading) {

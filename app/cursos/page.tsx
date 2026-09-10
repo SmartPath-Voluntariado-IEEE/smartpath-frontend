@@ -321,14 +321,18 @@ function CoursesContent() {
             </div>
           </section>
 
-          <section className="mb-5 rounded-2xl border border-[#e9e7f0] bg-white p-3 shadow-[0_4px_20px_rgba(13,17,51,.04)]">
+          <section data-tour="courses-skill-selector" className="mb-5 rounded-2xl border border-[#e9e7f0] bg-white p-3.5 shadow-2xs">
             <div className="flex flex-wrap items-center gap-2">
               {skills.map((skill) => (
                 <button
                   key={skill.slug}
                   type="button"
                   onClick={() => setActiveSkill(skill.slug)}
-                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${activeSkill === skill.slug ? "border-primary bg-primary text-white shadow-sm" : "border-[#e7e4ef] text-on-surface hover:border-primary/40 hover:text-primary"}`}
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                    activeSkill === skill.slug
+                      ? "border-primary bg-primary text-white shadow-2xs"
+                      : "border-[#e7e4ef] text-on-surface hover:border-primary/40 hover:text-primary"
+                  }`}
                 >
                   {getSkillIcon(skill.slug, 15, activeSkill === skill.slug ? "text-white" : "text-primary")} {skill.name}
                 </button>
@@ -365,11 +369,11 @@ function CoursesContent() {
             <>
               <div className="mb-4 flex items-center justify-between gap-4">
                 <p className="text-sm text-on-surface-variant"><strong className="text-on-surface">{filteredCourses.length}</strong> cursos encontrados</p>
-                {activeSkill && <span className="hidden text-xs text-primary sm:inline">Habilidad seleccionada: {selectedSkill?.name ?? activeSkill}</span>}
+                {activeSkill && <span className="hidden text-xs text-primary sm:inline font-semibold">Habilidad seleccionada: {selectedSkill?.name ?? activeSkill}</span>}
               </div>
 
               {filteredCourses.length > 0 ? (
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div data-tour="courses-grid" className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                   {filteredCourses.map((course) => {
                     const isSelected = selectedCourseIds.includes(Number(course.id));
                     return (

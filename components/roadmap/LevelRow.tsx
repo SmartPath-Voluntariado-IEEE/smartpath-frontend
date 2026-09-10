@@ -162,7 +162,7 @@ export function LevelRow({
           {/* Skill Cards Grid (Accordion Content) */}
           {expanded && (
             <div className="mt-6 pt-4 border-t border-border-light">
-              <div className="flex flex-wrap gap-4 justify-start">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5">
                 {level.skills.map((skill, skillIndex) => {
                   const percent = getSkillPercent(skill.skill_slug);
                   // El backend ya devuelve el conteo; el catálogo local solo

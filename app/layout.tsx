@@ -1,9 +1,11 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 import { AppHeader } from "@/components/AppHeader";
 import { AppFooter } from "@/components/AppFooter";
 import { Toaster } from "@/components/ui/sonner";
+import { SmartPathTourProvider } from "@/components/tour/SmartPathTourProvider";
 
 const poppins = Poppins({
   weight: ["400", "500", "600", "700", "800"],
@@ -37,12 +39,16 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       </head>
       <body className="bg-background font-body-md text-on-surface selection:bg-primary-container selection:text-on-primary-container antialiased min-h-screen flex flex-col">
-        <AppHeader />
-        <main className="flex-1 w-full">
-          {children}
-        </main>
-        <AppFooter />
-        <Toaster />
+        <Suspense fallback={null}>
+          <SmartPathTourProvider>
+            <AppHeader />
+            <main className="flex-1 w-full">
+              {children}
+            </main>
+            <AppFooter />
+            <Toaster />
+          </SmartPathTourProvider>
+        </Suspense>
       </body>
     </html>
   );
