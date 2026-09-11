@@ -13,12 +13,13 @@ import { useSmartPathTour } from "@/components/tour/SmartPathTourProvider";
 export function AppHeader() {
   const pathname = usePathname();
   const { profile, hydrated, clear } = useProfile();
-  const isLanding = pathname === "/";
-  const isAuthed = hydrated && !!profile && !isLanding;
+  const isLogin = pathname === "/login" || pathname.startsWith("/auth");
+  const isLanding = pathname === "/" || pathname === "/landing" || pathname === "/onboarding";
+  const isAuthed = hydrated && !!profile && !isLanding && !isLogin;
   const router = useRouter();
   const { startTour } = useSmartPathTour();
 
-  if (pathname === "/" || pathname === "/landing" || pathname === "/onboarding") {
+  if (isLanding) {
     return null;
   }
 
@@ -30,13 +31,25 @@ export function AppHeader() {
   };
 
   return (
-    <header className="md:hidden sticky top-0 z-40 bg-surface/90 shadow-xs backdrop-blur-lg">
-      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <img src="/img/logo.png" alt="SmartPath Logo" className="h-8 w-auto object-contain" />
+    <header
+      className={`sticky top-0 z-40 bg-white/95 shadow-xs backdrop-blur-lg border-b border-slate-100 ${
+        isLogin ? "block" : "md:hidden"
+      }`}
+    >
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+        <Link href={isLogin ? "/" : "/dashboard"} className="flex items-center gap-2">
+          <img src="/img/logo.png" alt="SmartPath Logo" className="h-9 w-auto object-contain" />
         </Link>
 
-        <div className="flex items-center gap-2">
+        {isLogin ? (
+          <Link
+            href="/"
+            className="text-xs font-semibold text-slate-500 hover:text-[#6E43FF] transition-colors"
+          >
+            ← Volver al inicio
+          </Link>
+        ) : (
+          <div className="flex items-center gap-2">
           {isAuthed ? (
             <>
               <button
@@ -66,10 +79,9 @@ export function AppHeader() {
                 Salir
               </Button>
             </>
-          ) : (
-            <div></div>
-          )}
+          ) : null}
         </div>
+        )}
       </div>
     </header>
   );

@@ -158,3 +158,32 @@
   border-radius: 16px;
   box-shadow: 0 4px 20px rgba(13, 17, 51, 0.06);
 }
+
+/* Transición de aparición con blur para el Tour Guiado */
+@keyframes tourFadeBlurIn {
+  0% {
+    opacity: 0;
+    filter: blur(14px);
+    transform: scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0px);
+    transform: scale(1);
+  }
+}
+
+.animate-tour-blur {
+  animation: tourFadeBlurIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.reactour__popover {
+  animation: tourFadeBlurIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  max-width: min(390px, calc(100vw - 32px)) !important;
+}
+
+.reactour__mask {
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  transition: all 0.45s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}

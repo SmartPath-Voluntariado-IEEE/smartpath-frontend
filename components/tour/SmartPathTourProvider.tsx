@@ -2,10 +2,53 @@
 
 import React, { useEffect, useMemo } from "react";
 import { TourProvider, useTour, StepType } from "@reactour/tour";
+import type { PositionProps } from "@reactour/popover";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Compass, Sparkles, MapPin, BookOpen, Briefcase, ArrowRight, Check } from "lucide-react";
 
 const TOUR_STORAGE_KEY = "smartpath.tour_completed";
+
+type PopoverPosition = "top" | "right" | "bottom" | "left" | "center";
+
+/**
+ * Calcula dinámicamente la mejor posición para el modal del tour,
+ * eligiendo siempre el lado que más espacio libre tenga en la pantalla
+ * para evitar recortes y desbordamientos.
+ */
+function getOptimalTourPosition(props: PositionProps): PopoverPosition {
+  const { top, bottom, left, right, windowWidth, windowHeight } = props;
+
+  const spaceTop = Math.max(0, top);
+  const spaceBottom = Math.max(0, windowHeight - bottom);
+  const spaceRight = Math.max(0, windowWidth - right);
+  const spaceLeft = Math.max(0, left);
+
+  // Si el componente está en la barra lateral izquierda (ej. x < 320), abrir a la derecha
+  if (left < 320 && spaceRight > 340) {
+    return "right";
+  }
+
+  // Si el componente está muy pegado al borde superior, abrir hacia abajo
+  if (top < 240 && spaceBottom > 280) {
+    return "bottom";
+  }
+
+  // Si está muy pegado al borde derecho, abrir a la izquierda
+  if (windowWidth - right < 340 && spaceLeft > 340) {
+    return "left";
+  }
+
+  // Elegir el lado con mayor espacio disponible
+  const sides: { side: PopoverPosition; space: number }[] = [
+    { side: "right", space: spaceRight },
+    { side: "bottom", space: spaceBottom },
+    { side: "top", space: spaceTop },
+    { side: "left", space: spaceLeft },
+  ];
+
+  sides.sort((a, b) => b.space - a.space);
+  return sides[0].side;
+}
 
 export function SmartPathTourProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -14,8 +57,9 @@ export function SmartPathTourProvider({ children }: { children: React.ReactNode 
   const steps: StepType[] = useMemo(() => [
     {
       selector: '[data-tour="nav-sections"]',
+      position: "right", // Se asegura que en la barra lateral el modal se abra siempre hacia la derecha
       content: () => (
-        <div className="space-y-2 p-1">
+        <div className="space-y-2 p-1 animate-tour-blur">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#6E43FF]">
             <Compass className="w-4 h-4" />
             <span>Paso 1 de 5 · Navegación Principal</span>
@@ -31,8 +75,9 @@ export function SmartPathTourProvider({ children }: { children: React.ReactNode 
     },
     {
       selector: '[data-tour="dashboard-hero"]',
+      position: "bottom",
       content: () => (
-        <div className="space-y-2 p-1">
+        <div className="space-y-2 p-1 animate-tour-blur">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#6E43FF]">
             <MapPin className="w-4 h-4" />
             <span>Paso 2 de 5 · Tu Meta y Progreso</span>
@@ -49,7 +94,7 @@ export function SmartPathTourProvider({ children }: { children: React.ReactNode 
     {
       selector: '[data-tour="dashboard-next-action"]',
       content: () => (
-        <div className="space-y-2 p-1">
+        <div className="space-y-2 p-1 animate-tour-blur">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#FF8A00]">
             <Sparkles className="w-4 h-4 text-[#FF8A00]" />
             <span>Paso 3 de 5 · Siguiente Acción Inmediata</span>
@@ -66,7 +111,7 @@ export function SmartPathTourProvider({ children }: { children: React.ReactNode 
     {
       selector: '[data-tour="dashboard-courses"]',
       content: () => (
-        <div className="space-y-2 p-1">
+        <div className="space-y-2 p-1 animate-tour-blur">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#3D5AFE]">
             <BookOpen className="w-4 h-4" />
             <span>Paso 4 de 5 · Mis Cursos Activos</span>
@@ -83,7 +128,7 @@ export function SmartPathTourProvider({ children }: { children: React.ReactNode 
     {
       selector: '[data-tour="dashboard-jobs"]',
       content: () => (
-        <div className="space-y-2 p-1">
+        <div className="space-y-2 p-1 animate-tour-blur">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-600">
             <Briefcase className="w-4 h-4" />
             <span>Paso 5 de 5 · Mercado Laboral & Match</span>
@@ -99,29 +144,36 @@ export function SmartPathTourProvider({ children }: { children: React.ReactNode 
     },
   ], []);
 
-  const customStyles = {
-    popover: (base: React.CSSProperties) => ({
+  const customStyles: any = {
+    popover: (base: any) => ({
       ...base,
       backgroundColor: "#FFFFFF",
-      borderRadius: "16px",
-      padding: "20px",
-      boxShadow: "0 20px 40px -10px rgba(13, 17, 51, 0.18), 0 0 0 1px rgba(229, 231, 235, 0.9)",
-      maxWidth: "380px",
+      borderRadius: "20px",
+      padding: "22px",
+      boxShadow: "0 25px 50px -12px rgba(13, 17, 51, 0.25), 0 0 0 1px rgba(229, 231, 235, 0.9)",
+      maxWidth: "min(390px, calc(100vw - 32px))",
       color: "#0D1133",
       fontFamily: "var(--font-poppins), sans-serif",
     }),
-    maskArea: (base: React.CSSProperties) => ({
+    maskWrapper: (base: any) => ({
       ...base,
-      rx: 16,
+      backdropFilter: "blur(6px)",
+      WebkitBackdropFilter: "blur(6px)",
+      transition: "all 0.45s cubic-bezier(0.16, 1, 0.3, 1)",
     }),
-    badge: (base: React.CSSProperties) => ({
+    maskArea: (base: any) => ({
+      ...base,
+      rx: 20,
+      transition: "all 0.45s cubic-bezier(0.16, 1, 0.3, 1)",
+    }),
+    badge: (base: any) => ({
       ...base,
       backgroundColor: "#6E43FF",
       color: "#FFFFFF",
       fontWeight: 700,
       fontSize: "11px",
     }),
-    dot: (base: React.CSSProperties, state?: { current?: boolean }) => ({
+    dot: (base: any, state?: { current?: boolean }) => ({
       ...base,
       backgroundColor: state?.current ? "#6E43FF" : "#E5E7EB",
       width: state?.current ? "20px" : "8px",
@@ -129,11 +181,11 @@ export function SmartPathTourProvider({ children }: { children: React.ReactNode 
       borderRadius: "999px",
       transition: "all 0.25s ease",
     }),
-    close: (base: React.CSSProperties) => ({
+    close: (base: any) => ({
       ...base,
       color: "#6B7280",
-      top: 12,
-      right: 12,
+      top: 14,
+      right: 14,
       width: 24,
       height: 24,
     }),
@@ -143,7 +195,8 @@ export function SmartPathTourProvider({ children }: { children: React.ReactNode 
     <TourProvider
       steps={steps}
       styles={customStyles}
-      padding={10}
+      position={getOptimalTourPosition}
+      padding={12}
       showDots={true}
       showNavigation={true}
       showBadge={true}
@@ -178,7 +231,7 @@ export function SmartPathTourProvider({ children }: { children: React.ReactNode 
                 setCurrentStep((s) => s + 1);
               }
             }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#6E43FF] hover:bg-[#5B2FE0] text-white text-xs font-bold shadow-xs transition"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#6E43FF] hover:bg-[#5B2FE0] text-white text-xs font-bold shadow-xs transition transform hover:scale-105 active:scale-95"
           >
             {isLast ? (
               <>

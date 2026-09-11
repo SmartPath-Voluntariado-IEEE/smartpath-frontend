@@ -83,13 +83,18 @@ export function AppSidebar() {
     router.push("/");
   };
 
-  const isLanding = pathname === "/" || pathname === "/landing" || pathname === "/onboarding";
-  const isAuthed = hydrated && !!profile && !isLanding;
+  const isAuthFlow =
+    pathname === "/" ||
+    pathname === "/landing" ||
+    pathname === "/onboarding" ||
+    pathname === "/login" ||
+    pathname.startsWith("/auth");
+  const isAuthed = hydrated && !!profile && !isAuthFlow;
 
   if (!isAuthed && mounted) {
     return null;
   }
-  if (!mounted) {
+  if (!mounted || isAuthFlow) {
     return null;
   }
 

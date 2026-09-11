@@ -82,7 +82,7 @@ export async function upsertBackendProfile(token: string, profile: UserProfile):
       .filter((s) => s.level > 0)
       .map((s) => ({
         skill_slug: s.skillId,
-        level: Number(s.level),
+        level: Math.min(5, Math.max(1, Math.round(Number(s.level) || 1))),
       })),
   };
 
