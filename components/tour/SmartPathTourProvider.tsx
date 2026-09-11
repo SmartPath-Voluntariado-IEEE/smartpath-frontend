@@ -217,11 +217,26 @@ function TourController() {
 
     // Si viene explícitamente con ?tour=true o está en dashboard y nunca lo ha completado
     if (tourParam === "true" || (pathname === "/dashboard" && !isCompleted)) {
-      // Breve retardo para asegurar que los elementos del DOM estén montados
-      const timer = setTimeout(() => {
-        setIsOpen(true);
-      }, 700);
-      return () => clearTimeout(timer);
+      let attempts = 0;
+      // Verificar activamente que el contenido principal esté en el DOM y que no haya spinner de carga
+      const interval = setInterval(() => {
+        attempts++;
+        const targetElement = document.querySelector('[data-tour="dashboard-hero"]');
+        const isStillLoading = !!document.querySelector('.animate-spin');
+
+        if (targetElement && !isStillLoading) {
+          clearInterval(interval);
+          // Breve pausa para asegurar transición visual suave tras terminar de cargar
+          setTimeout(() => {
+            setIsOpen(true);
+          }, 350);
+        } else if (attempts > 50) {
+          // Timeout de seguridad tras 20 segundos para no quedar en bucle
+          clearInterval(interval);
+        }
+      }, 400);
+
+      return () => clearInterval(interval);
     }
   }, [pathname, searchParams, setIsOpen, isOpen]);
 

@@ -8,7 +8,7 @@ import { useProfile } from "@/hooks/use-profile";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, BookOpen, ArrowRight, CheckCircle2, Building2, Clock, Zap, Sparkles, Compass } from "lucide-react";
+import { Loader2, BookOpen, ArrowRight, CheckCircle2, Building2, Clock, Zap, Sparkles, Compass, HelpCircle } from "lucide-react";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useSmartPathTour } from "@/components/tour/SmartPathTourProvider";
 import { DashboardAchievementsWidget } from "@/components/achievements/DashboardAchievementsWidget";
@@ -307,9 +307,6 @@ export default function DashboardPage() {
 
             <div className="relative z-10">
               <div className="flex items-center justify-between">
-                <span className="rounded-full bg-white/20 backdrop-blur-md px-3 py-1 text-xs font-semibold text-white">
-                  Progreso General de tu Ruta
-                </span>
                 <span className="text-xs text-white/80 font-medium">Meta: {profile.targetMonths || 6} meses (~{totalHours}h)</span>
               </div>
 
@@ -339,72 +336,83 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Bloque Derecho: TU SIGUIENTE ACCIÓN RECOMENDADA (HU-72 y HU-73) */}
+          {/* Bloque Derecho: TU SIGUIENTE ACCIÓN RECOMENDADA con Border Beam Animado (Morado & Naranja) */}
           <div
             data-tour="dashboard-next-action"
-            className="lg:col-span-5 rounded-3xl bg-white border-2 border-primary/25 p-6 shadow-sm flex flex-col justify-between relative overflow-hidden bg-gradient-to-b from-white to-indigo-50/20"
+            className="lg:col-span-5 relative rounded-3xl p-[2.5px] overflow-hidden shadow-card transition-shadow hover:shadow-highlight flex flex-col group"
           >
-            <div className="absolute top-0 right-0 px-3 py-1 bg-primary text-white text-[10px] font-bold rounded-bl-2xl uppercase tracking-wider shadow-2xs">
-              Recomendación de hoy
-            </div>
+            {/* Border Beam: Haz de luz animado en bucle continuo de color morado (#6E43FF) y naranja (#FF8A00) */}
+            <div
+              className="absolute inset-[-150%] animate-[spin_4s_linear_infinite] pointer-events-none"
+              style={{
+                background: "conic-gradient(from 0deg at 50% 50%, transparent 0deg, transparent 270deg, #FF8A00 295deg, #6E43FF 330deg, #FF8A00 360deg)",
+              }}
+            />
 
-            <div>
-              <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary">
-                <Sparkles className="w-4 h-4 text-amber-500" />
-                Tu siguiente acción prioritaria
+            {/* Contenedor interior de la card */}
+            <div className="relative z-10 flex-1 w-full rounded-[22px] bg-white p-6 flex flex-col justify-between overflow-hidden bg-gradient-to-b from-white to-indigo-50/20">
+              <div className="absolute top-0 right-0 px-3.5 py-1 bg-gradient-to-r from-primary to-orange-500 text-white text-[10px] font-extrabold rounded-bl-2xl uppercase tracking-wider shadow-2xs">
+                Recomendación de hoy
               </div>
 
-              {nextSkillName ? (
-                <>
-                  <h3 className="font-display font-bold text-gray-900 text-lg mt-2 leading-snug">
-                    Avanza en tu Nivel {activeLevelNumber}: Desarrolla <span className="text-primary">{nextSkillName}</span>
-                  </h3>
-                  <p className="text-xs text-gray-600 mt-1.5 leading-relaxed">
-                    {nextSkillDemandPct
-                      ? `Aparece en el ${nextSkillDemandPct}% de las ofertas del mercado peruano para este rol.`
-                      : "Es una de las habilidades requeridas para completar tu siguiente nivel en el roadmap."}
-                  </p>
-
-                  <div className="mt-4 p-3.5 rounded-2xl bg-white border border-gray-200/80 flex items-center justify-between gap-3 shadow-2xs">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="h-9 w-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                        {getSkillIcon(nextSkillSlug || "code", 18)}
-                      </div>
-                      <div className="text-xs min-w-0">
-                        <p className="font-bold text-gray-900 truncate">Cursos recomendados para {nextSkillName}</p>
-                        <p className="text-gray-500 text-[11px]">Enfocado en cerrar tu brecha técnica</p>
-                      </div>
-                    </div>
-                    <Link
-                      href={`/cursos?skill=${nextSkillSlug}`}
-                      className="inline-flex items-center justify-center shrink-0 px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition"
-                    >
-                      Ver cursos
-                    </Link>
-                  </div>
-                </>
-              ) : (
-                <div className="mt-3">
-                  <h3 className="font-display font-bold text-gray-900 text-base">¡Felicidades! Has completado todas las skills clave</h3>
-                  <p className="text-xs text-gray-600 mt-1">Explora cursos avanzados o postula a ofertas laborales directamente.</p>
+              <div>
+                <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary">
+                  <Sparkles className="w-4 h-4 text-orange-500 animate-pulse" />
+                  Tu siguiente acción prioritaria
                 </div>
-              )}
-            </div>
 
-            <div className="mt-5 pt-3.5 border-t border-gray-100 flex items-center gap-2.5">
-              <Link
-                href={nextSkillSlug ? `/cursos?skill=${nextSkillSlug}` : "/roadmap"}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold shadow-sm transition transform active:scale-98"
-              >
-                <Zap className="w-3.5 h-3.5" /> Comenzar esta habilidad
-              </Link>
-              <Link
-                href="/roadmap"
-                className="p-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-600 text-xs font-semibold"
-                title="Ver en Roadmap"
-              >
-                <ArrowRight className="w-4 h-4" />
-              </Link>
+                {nextSkillName ? (
+                  <>
+                    <h3 className="font-display font-bold text-gray-900 text-lg mt-2 leading-snug">
+                      Avanza en tu Nivel {activeLevelNumber}: Desarrolla <span className="text-primary font-extrabold">{nextSkillName}</span>
+                    </h3>
+                    <p className="text-xs text-gray-600 mt-1.5 leading-relaxed">
+                      {nextSkillDemandPct
+                        ? `Aparece en el ${nextSkillDemandPct}% de las ofertas del mercado peruano para este rol.`
+                        : "Es una de las habilidades requeridas para completar tu siguiente nivel en el roadmap."}
+                    </p>
+
+                    <div className="mt-4 p-3.5 rounded-2xl bg-white border border-gray-200/80 flex items-center justify-between gap-3 shadow-2xs">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="h-9 w-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                          {getSkillIcon(nextSkillSlug || "code", 18)}
+                        </div>
+                        <div className="text-xs min-w-0">
+                          <p className="font-bold text-gray-900 truncate">Cursos recomendados para {nextSkillName}</p>
+                          <p className="text-gray-500 text-[11px]">Enfocado en cerrar tu brecha técnica</p>
+                        </div>
+                      </div>
+                      <Link
+                        href={`/cursos?skill=${nextSkillSlug}`}
+                        className="inline-flex items-center justify-center shrink-0 px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition"
+                      >
+                        Ver cursos
+                      </Link>
+                    </div>
+                  </>
+                ) : (
+                  <div className="mt-3">
+                    <h3 className="font-display font-bold text-gray-900 text-base">¡Felicidades! Has completado todas las skills clave</h3>
+                    <p className="text-xs text-gray-600 mt-1">Explora cursos avanzados o postula a ofertas laborales directamente.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-5 pt-3.5 border-t border-gray-100 flex items-center gap-2.5">
+                <Link
+                  href={nextSkillSlug ? `/cursos?skill=${nextSkillSlug}` : "/roadmap"}
+                  className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#6E43FF] to-[#8B5CF6] hover:from-[#5B2FE0] hover:to-[#7C3AED] text-white text-xs font-bold shadow-md transition transform active:scale-98"
+                >
+                  <Zap className="w-3.5 h-3.5 text-orange-300" /> Comenzar esta habilidad
+                </Link>
+                <Link
+                  href="/roadmap"
+                  className="p-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-600 text-xs font-semibold transition"
+                  title="Ver en Roadmap"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
             </div>
           </div>
 
@@ -601,10 +609,30 @@ export default function DashboardPage() {
 
           {/* Cuadrícula 2x2 de Métricas Clave */}
           <div className="grid grid-cols-2 gap-3">
-            <StatCard label="Cobertura" value={`${progressPct}%`} hint={`${mastered.length}/${target.core_skill_slugs?.length ?? 12} skills`} />
-            <StatCard label="Por aprender" value={String(missing.length)} hint="Priorizadas" />
-            <StatCard label="Horas est." value={`${totalHours}h`} hint="Ruta completa" />
-            <StatCard label="Ofertas PE" value={String(totalJobs)} hint="Mercado analizado" />
+            <StatCard
+              label="Cobertura"
+              value={`${progressPct}%`}
+              hint={`${mastered.length}/${target.core_skill_slugs?.length ?? 12} skills`}
+              tooltip="Porcentaje de habilidades clave que ya dominas para tu rol objetivo según tu perfil."
+            />
+            <StatCard
+              label="Por aprender"
+              value={String(missing.length)}
+              hint="Priorizadas"
+              tooltip="Habilidades prioritarias que las empresas peruanas exigen y que aún te falta desarrollar."
+            />
+            <StatCard
+              label="Horas est."
+              value={`${totalHours}h`}
+              hint="Ruta completa"
+              tooltip="Tiempo aproximado para completar toda tu ruta estudiando a tu ritmo semanal actual."
+            />
+            <StatCard
+              label="Ofertas PE"
+              value={String(totalJobs)}
+              hint="Mercado analizado"
+              tooltip="Vacantes reales en el mercado peruano analizadas para calcular tu encaje y nivel de match."
+            />
           </div>
 
           {/* Top Skills Demandadas en el Mercado */}
@@ -863,12 +891,45 @@ function MatchRadialGauge({ percentage }: { percentage: number }) {
   );
 }
 
-function StatCard({ label, value, hint }: { label: string; value: string; hint: string }) {
+function StatCard({
+  label,
+  value,
+  hint,
+  tooltip,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  tooltip?: string;
+}) {
   return (
-    <div className="surface-card p-5 bg-white">
-      <div className="text-xs font-medium uppercase tracking-wider text-on-surface-variant">{label}</div>
-      <div className="mt-2 font-display text-3xl font-bold text-on-surface">{value}</div>
-      <div className="mt-1 text-xs text-on-surface-variant">{hint}</div>
+    <div className="surface-card p-4 sm:p-5 bg-white relative flex flex-col justify-between">
+      <div>
+        <div className="flex items-center justify-between gap-1">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500 truncate">
+            {label}
+          </span>
+          {tooltip && (
+            <div className="relative group/tooltip inline-flex items-center shrink-0">
+              <button
+                type="button"
+                className="text-gray-400 hover:text-primary transition-colors p-0.5 rounded-full focus:outline-none"
+                aria-label={`Información sobre ${label}`}
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+              </button>
+              <div className="pointer-events-none absolute bottom-full right-0 mb-2 hidden group-hover/tooltip:block z-50 w-52 rounded-xl bg-slate-900 px-3 py-2 text-center text-[11px] font-normal normal-case leading-relaxed text-white shadow-xl backdrop-blur-md">
+                {tooltip}
+                <div className="absolute top-full right-2 -mt-1 border-4 border-transparent border-t-slate-900" />
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="mt-2 font-display text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
+          {value}
+        </div>
+      </div>
+      <div className="mt-1.5 text-xs text-gray-500">{hint}</div>
     </div>
   );
 }

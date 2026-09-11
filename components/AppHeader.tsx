@@ -9,12 +9,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { UserCircle, Compass } from "lucide-react";
 import { useSmartPathTour } from "@/components/tour/SmartPathTourProvider";
 
-const NAV = [
-  { href: "/dashboard", label: "Dashboard", tourId: "nav-dashboard" },
-  { href: "/roadmap", label: "Roadmap", tourId: "nav-roadmap" },
-  { href: "/cursos", label: "Cursos", tourId: "nav-cursos" },
-  { href: "/bolsa-laboral", label: "Bolsa laboral", tourId: "nav-bolsa" },
-] as const;
 
 export function AppHeader() {
   const pathname = usePathname();
@@ -36,31 +30,11 @@ export function AppHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-surface/80 shadow-sm backdrop-blur-lg">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-        <Link href="/" className="flex items-center gap-2">
-          <img src="/img/logo.png" alt="SmartPath Logo" className="h-15 w-auto object-contain" />
+    <header className="md:hidden sticky top-0 z-40 bg-surface/90 shadow-xs backdrop-blur-lg">
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
+        <Link href="/dashboard" className="flex items-center gap-2">
+          <img src="/img/logo.png" alt="SmartPath Logo" className="h-8 w-auto object-contain" />
         </Link>
-
-        {isAuthed && (
-          <nav data-tour="nav-sections" className="hidden items-center gap-1 md:flex">
-            {NAV.map((item) => {
-              const active = pathname.startsWith(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  data-tour={item.tourId}
-                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                    active ? "bg-[#F3F0FF] text-[#6E43FF] font-semibold" : "text-[#6B7280] hover:text-[#6E43FF]"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-        )}
 
         <div className="flex items-center gap-2">
           {isAuthed ? (
