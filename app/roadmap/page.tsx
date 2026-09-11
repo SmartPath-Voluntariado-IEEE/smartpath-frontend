@@ -10,6 +10,8 @@ import { RoadmapHeader } from "@/components/roadmap/RoadmapHeader";
 import { LevelRow } from "@/components/roadmap/LevelRow";
 import type { RoadmapLevel, GapAnalysis } from "@/types/roadmap";
 
+import { RoadmapSkeleton } from "@/components/skeletons";
+
 export default function RoadmapPage() {
   const { session, loading: authLoading } = useRequireAuth();
   const { profile, hydrated } = useProfile();
@@ -50,11 +52,7 @@ export default function RoadmapPage() {
   const loading = !hydrated || authLoading || loadingData;
 
   if (loading) {
-    return (
-      <div className="mx-auto max-w-5xl px-6 py-10 flex justify-center items-center h-[50vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <RoadmapSkeleton />;
   }
 
   if (!profile) {

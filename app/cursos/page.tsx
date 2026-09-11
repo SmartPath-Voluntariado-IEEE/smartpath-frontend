@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { CursosSkeleton } from "@/components/skeletons";
 
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -294,11 +295,7 @@ function CoursesContent() {
   }
 
   if (authLoading || loading) {
-    return (
-      <div className="grid min-h-[60vh] place-items-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" aria-label="Cargando cursos" />
-      </div>
-    );
+    return <CursosSkeleton />;
   }
 
   return (
@@ -536,5 +533,9 @@ function CourseFact({ icon, value, label }: { icon: React.ReactNode; value: stri
 }
 
 export default function CoursesPage() {
-  return <Suspense fallback={<div className="grid min-h-[60vh] place-items-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}><CoursesContent /></Suspense>;
+  return (
+    <Suspense fallback={<CursosSkeleton />}>
+      <CoursesContent />
+    </Suspense>
+  );
 }

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Loader2, BookOpen, ArrowRight, CheckCircle2, Building2, Clock, Zap, Sparkles, Compass, HelpCircle } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/tooltip";
+import { DashboardSkeleton } from "@/components/skeletons";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useSmartPathTour } from "@/components/tour/SmartPathTourProvider";
 import { DashboardAchievementsWidget } from "@/components/achievements/DashboardAchievementsWidget";
@@ -198,11 +199,7 @@ export default function DashboardPage() {
   const loading = !hydrated || authLoading || loadingData;
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-container-low">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (!profile) {
