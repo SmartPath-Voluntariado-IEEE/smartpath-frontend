@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Loader2, BookOpen, ArrowRight, CheckCircle2, Building2, Clock, Zap, Sparkles, Compass, HelpCircle } from "lucide-react";
+import { InfoTooltip } from "@/components/ui/tooltip";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { useSmartPathTour } from "@/components/tour/SmartPathTourProvider";
 import { DashboardAchievementsWidget } from "@/components/achievements/DashboardAchievementsWidget";
@@ -257,34 +258,10 @@ export default function DashboardPage() {
               <h1 className="font-display text-2xl font-bold md:text-3xl text-gray-900">
                 {profile.fullName ? `¡Hola, ${profile.fullName.split(" ")[0]}!` : "¡Hola!"} 👋
               </h1>
-              <span className="inline-flex rounded-full bg-primary/10 border border-primary/20 px-2.5 py-0.5 text-xs font-semibold text-primary">
-                {profile.isGraduated ? "Egresado" : `Ciclo ${profile.cycle || "9"}`} · {profile.career || "Ingeniería"}
-              </span>
             </div>
             <p className="mt-0.5 text-sm text-gray-600">
               Tu ruta personalizada hacia <span className="font-semibold text-gray-900">{target.label}</span>
             </p>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <div className="flex shrink-0 items-center gap-2 rounded-2xl bg-white border border-gray-200/80 px-3.5 py-1.5 text-xs font-semibold text-orange-500 shadow-2xs">
-              <span className="text-sm">🔥</span> Racha: <span className="text-gray-900 font-bold">10 días</span>
-            </div>
-            <button
-              type="button"
-              onClick={startTour}
-              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-xl border border-primary/20 bg-surface-variant px-3 text-xs font-semibold text-primary hover:bg-primary/15 transition shadow-2xs"
-              title="Iniciar tour guiado interactivo"
-            >
-              <Compass className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Tour guiado</span>
-            </button>
-            <Link
-              href="/perfil"
-              className="inline-flex h-8 items-center justify-center rounded-xl border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs"
-            >
-              Ajustar perfil
-            </Link>
           </div>
         </div>
 
@@ -607,31 +584,39 @@ export default function DashboardPage() {
         {/* Columna Lateral (4 cols): Métricas Resumidas + Top Skills Demandadas */}
         <div className="lg:col-span-4 space-y-6">
 
-          {/* Cuadrícula 2x2 de Métricas Clave */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Cuadrícula 2x2 de Métricas Clave con Ilustraciones */}
+          <div className="grid grid-cols-2 gap-3.5">
             <StatCard
-              label="Cobertura"
+              label="COBERTURA"
               value={`${progressPct}%`}
               hint={`${mastered.length}/${target.core_skill_slugs?.length ?? 12} skills`}
               tooltip="Porcentaje de habilidades clave que ya dominas para tu rol objetivo según tu perfil."
+              imageSrc="/img/ui/cobertura.png"
+              imageAlt="Cobertura de habilidades"
             />
             <StatCard
-              label="Por aprender"
+              label="POR APRENDER"
               value={String(missing.length)}
               hint="Priorizadas"
               tooltip="Habilidades prioritarias que las empresas peruanas exigen y que aún te falta desarrollar."
+              imageSrc="/img/ui/por-aprender.png"
+              imageAlt="Habilidades por aprender"
             />
             <StatCard
-              label="Horas est."
+              label="HORAS EST."
               value={`${totalHours}h`}
               hint="Ruta completa"
               tooltip="Tiempo aproximado para completar toda tu ruta estudiando a tu ritmo semanal actual."
+              imageSrc="/img/ui/horas-estimadas.png"
+              imageAlt="Horas estimadas de estudio"
             />
             <StatCard
-              label="Ofertas PE"
+              label="OFERTAS PE"
               value={String(totalJobs)}
               hint="Mercado analizado"
               tooltip="Vacantes reales en el mercado peruano analizadas para calcular tu encaje y nivel de match."
+              imageSrc="/img/ui/ofertas.png"
+              imageAlt="Ofertas del mercado peruano"
             />
           </div>
 
@@ -896,40 +881,46 @@ function StatCard({
   value,
   hint,
   tooltip,
+  imageSrc,
+  imageAlt,
 }: {
   label: string;
   value: string;
   hint: string;
   tooltip?: string;
+  imageSrc?: string;
+  imageAlt?: string;
 }) {
   return (
-    <div className="surface-card p-4 sm:p-5 bg-white relative flex flex-col justify-between">
-      <div>
-        <div className="flex items-center justify-between gap-1">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500 truncate">
-            {label}
-          </span>
-          {tooltip && (
-            <div className="relative group/tooltip inline-flex items-center shrink-0">
-              <button
-                type="button"
-                className="text-gray-400 hover:text-primary transition-colors p-0.5 rounded-full focus:outline-none"
-                aria-label={`Información sobre ${label}`}
-              >
-                <HelpCircle className="w-3.5 h-3.5" />
-              </button>
-              <div className="pointer-events-none absolute bottom-full right-0 mb-2 hidden group-hover/tooltip:block z-50 w-52 rounded-xl bg-slate-900 px-3 py-2 text-center text-[11px] font-normal normal-case leading-relaxed text-white shadow-xl backdrop-blur-md">
-                {tooltip}
-                <div className="absolute top-full right-2 -mt-1 border-4 border-transparent border-t-slate-900" />
-              </div>
-            </div>
-          )}
+    <div className="group relative rounded-2xl sm:rounded-3xl bg-white p-4 sm:p-5 border border-slate-100/90 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-shadow overflow-hidden flex flex-col justify-between min-h-[112px]">
+      {/* Contenido textual en primer plano con ancho completo */}
+      <div className="relative z-10 flex flex-col justify-between h-full">
+        <div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-800 font-poppins">
+              {label}
+            </span>
+            {tooltip && (
+              <InfoTooltip text={tooltip} label={`Información sobre ${label}`} />
+            )}
+          </div>
+          <div className="mt-2 font-poppins text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-none">
+            {value}
+          </div>
         </div>
-        <div className="mt-2 font-display text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-          {value}
+        <div className="mt-2 text-xs font-medium text-slate-500">
+          {hint}
         </div>
       </div>
-      <div className="mt-1.5 text-xs text-gray-500">{hint}</div>
+
+      {/* Imagen flotante como guía visual de fondo sin robar espacio al texto */}
+      {imageSrc && (
+        <img
+          src={imageSrc}
+          alt={imageAlt || label}
+          className="absolute -bottom-1 -right-1 sm:bottom-1 sm:right-1.5 w-14 h-14 sm:w-16 sm:h-16 object-contain pointer-events-none select-none opacity-85 transition-transform duration-300 group-hover:scale-105 z-0"
+        />
+      )}
     </div>
   );
 }
