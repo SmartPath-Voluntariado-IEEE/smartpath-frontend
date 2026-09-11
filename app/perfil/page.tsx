@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { getCatalogSkills, getCatalogRoles, upsertBackendProfile } from "@/services/api";
 import { AchievementsSection } from "@/components/achievements/AchievementsSection";
+import { PerfilSkeleton } from "@/components/skeletons";
 
 type ProfileTab = "personal" | "preferences" | "skills" | "logros";
 
@@ -74,11 +75,7 @@ export default function ProfilePage() {
   const loading = !hydrated || authLoading || loadingData;
 
   if (loading) {
-    return (
-      <div className="mx-auto max-w-4xl px-6 py-10 flex justify-center items-center h-[50vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <PerfilSkeleton />;
   }
 
   if (!profile) {

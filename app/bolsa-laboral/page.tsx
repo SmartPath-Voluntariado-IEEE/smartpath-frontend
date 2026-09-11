@@ -20,6 +20,7 @@ import {
   getJobRecommendations,
   type JobRecommendationsResponse,
 } from "@/services/api";
+import { BolsaLaboralSkeleton } from "@/components/skeletons";
 
 const PAGE_SIZE = 12;
 
@@ -111,11 +112,7 @@ export default function BolsaLaboralPage() {
   const initialLoading = !hydrated || authLoading || (loading && !data);
 
   if (initialLoading) {
-    return (
-      <div className="mx-auto flex h-[50vh] max-w-5xl items-center justify-center px-6 py-10">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <BolsaLaboralSkeleton />;
   }
 
   if (!profile) {

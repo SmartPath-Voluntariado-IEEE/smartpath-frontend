@@ -10,6 +10,8 @@ import { RoadmapHeader } from "@/components/roadmap/RoadmapHeader";
 import { LevelRow } from "@/components/roadmap/LevelRow";
 import type { RoadmapLevel, GapAnalysis } from "@/types/roadmap";
 
+import { RoadmapSkeleton } from "@/components/skeletons";
+
 export default function RoadmapPage() {
   const { session, loading: authLoading } = useRequireAuth();
   const { profile, hydrated } = useProfile();
@@ -50,11 +52,7 @@ export default function RoadmapPage() {
   const loading = !hydrated || authLoading || loadingData;
 
   if (loading) {
-    return (
-      <div className="mx-auto max-w-5xl px-6 py-10 flex justify-center items-center h-[50vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <RoadmapSkeleton />;
   }
 
   if (!profile) {
@@ -97,18 +95,25 @@ export default function RoadmapPage() {
   const totalLevelsCount = roadmap.length > 0 ? roadmap.length : 5;
 
   return (
-    <div className="mx-auto max-w-[1200px] px-6 py-10">
-      <RoadmapHeader
-        targetRoleLabel={targetRole.label}
-        activeLevelNumber={activeLevelNumber}
-        totalLevelsCount={totalLevelsCount}
-        estimatedMonths={targetMonths || estimatedMonths}
-      />
+    <div className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6 md:py-10">
+      <div data-tour="roadmap-header">
+        <RoadmapHeader
+          targetRoleLabel={targetRole.label}
+          activeLevelNumber={activeLevelNumber}
+          totalLevelsCount={totalLevelsCount}
+          estimatedMonths={targetMonths || estimatedMonths}
+        />
+      </div>
 
-      <div className="mb-6">
-        <h2 className="font-display text-xl font-bold text-text-primary md:text-2xl">
-          Ruta por niveles
-        </h2>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className="font-display text-xl font-bold text-text-primary md:text-2xl">
+            Ruta por niveles
+          </h2>
+          <p className="text-xs text-text-secondary mt-0.5">
+            Avanza paso a paso dominando cada bloque de competencias técnicas.
+          </p>
+        </div>
       </div>
 
       {roadmap.length === 0 ? (
@@ -121,7 +126,7 @@ export default function RoadmapPage() {
           </p>
         </div>
       ) : (
-        <div className="mt-6">
+        <div data-tour="roadmap-timeline" className="mt-6">
           {roadmap.map((lvl, index) => (
             <LevelRow
               key={lvl.level}

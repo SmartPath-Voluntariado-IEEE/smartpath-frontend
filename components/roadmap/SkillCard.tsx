@@ -29,7 +29,7 @@ export function SkillCard({
 
   return (
     <div
-      className={`surface-card relative flex w-full max-w-[200px] flex-col items-center justify-between p-4 transition-all duration-200 hover:shadow-highlight hover:-translate-y-0.5 ${
+      className={`surface-card relative flex w-full flex-col items-center justify-between p-4 transition-all duration-200 hover:shadow-highlight hover:-translate-y-0.5 ${
         isMastered ? "border-emerald-200/80 bg-emerald-50/20" : ""
       }`}
     >
