@@ -3,6 +3,7 @@ import { API_BASE_URL } from "@/lib/constants";
 import type { UserProfile } from "@/lib/profile-store";
 
 import { supabase } from "@/lib/supabaseClient";
+import { fetchWithCache, invalidateCache } from "@/lib/request-cache";
 
 export const api = axios.create({
     baseURL: API_BASE_URL
@@ -87,6 +88,10 @@ export async function upsertBackendProfile(token: string, profile: UserProfile):
   };
 
   const response = await api.post("/users/profile", payload, getAuthHeader(token));
+  invalidateCache("roadmap");
+  invalidateCache("gap");
+  invalidateCache("progress");
+  invalidateCache("matches");
   return response.data;
 }
 
@@ -177,13 +182,17 @@ export function isOnboardingComplete(profile: any): boolean {
 }
 
 export async function getCatalogSkills(): Promise<any> {
-  const response = await api.get("/catalog/skills");
-  return response.data;
+  return fetchWithCache("catalog-skills", async () => {
+    const response = await api.get("/catalog/skills");
+    return response.data;
+  }, 10 * 60 * 1000);
 }
 
 export async function getCatalogJobs(): Promise<any> {
-  const response = await api.get("/catalog/jobs");
-  return response.data;
+  return fetchWithCache("catalog-jobs", async () => {
+    const response = await api.get("/catalog/jobs");
+    return response.data;
+  }, 10 * 60 * 1000);
 }
 
 // ============================================
@@ -230,15 +239,19 @@ export interface JobMatch {
 }
 
 export async function getMarketOverview(): Promise<MarketOverview> {
-  const response = await api.get("/market/overview");
-  return response.data;
+  return fetchWithCache("market-overview", async () => {
+    const response = await api.get("/market/overview");
+    return response.data;
+  }, 10 * 60 * 1000);
 }
 
 export async function getUserJobMatches(token: string): Promise<JobMatch[]> {
-  const response = await api.get("/users/job-matches", {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return response.data;
+  return fetchWithCache(`matches:${token}`, async () => {
+    const response = await api.get("/users/job-matches", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  }, 3 * 60 * 1000);
 }
 
 export interface CatalogCourse {
@@ -272,18 +285,24 @@ export async function getCatalogCourses(
 }
 
 export async function getCatalogRoles(): Promise<any> {
-  const response = await api.get("/catalog/roles");
-  return response.data;
+  return fetchWithCache("catalog-roles", async () => {
+    const response = await api.get("/catalog/roles");
+    return response.data;
+  }, 10 * 60 * 1000);
 }
 
 export async function getGapAnalysis(token: string): Promise<any> {
-  const response = await api.get("/users/gap-analysis", getAuthHeader(token));
-  return response.data;
+  return fetchWithCache(`gap:${token}`, async () => {
+    const response = await api.get("/users/gap-analysis", getAuthHeader(token));
+    return response.data;
+  }, 2 * 60 * 1000);
 }
 
 export async function getRoadmap(token: string): Promise<any> {
-  const response = await api.get("/users/roadmap", getAuthHeader(token));
-  return response.data;
+  return fetchWithCache(`roadmap:${token}`, async () => {
+    const response = await api.get("/users/roadmap", getAuthHeader(token));
+    return response.data;
+  }, 2 * 60 * 1000);
 }
 
 export async function getCourseRecommendations(token: string, skillSlug: string): Promise<any> {
@@ -308,6 +327,8 @@ export async function selectCourseForSkill(
       params: { course_id: courseId },
     }
   );
+  invalidateCache("progress");
+  invalidateCache("roadmap");
   return response.data;
 }
 
@@ -317,6 +338,8 @@ export async function unlinkCourseFromSkill(token: string, skillSlug: string): P
     `/roadmap/skills/${skillSlug}/course`,
     getAuthHeader(token)
   );
+  invalidateCache("progress");
+  invalidateCache("roadmap");
   return response.data;
 }
 
@@ -373,6 +396,9 @@ export async function submitModuleQuiz(
     answers,
     getAuthHeader(token)
   );
+  invalidateCache("progress");
+  invalidateCache("skill-progress");
+  invalidateCache("roadmap");
   return response.data;
 }
 
@@ -386,8 +412,10 @@ export interface CourseProgressSummary {
 
 /** Resumen de progreso de cursos por skill, para el dashboard. */
 export async function getDashboardCourseProgress(token: string): Promise<CourseProgressSummary[]> {
-  const response = await api.get("/dashboard/course-progress", getAuthHeader(token));
-  return response.data;
+  return fetchWithCache(`progress:${token}`, async () => {
+    const response = await api.get("/dashboard/course-progress", getAuthHeader(token));
+    return response.data;
+  }, 60 * 1000);
 }
 
 // ============================================
@@ -590,8 +618,10 @@ export interface SkillProgress {
 }
 
 export async function getUserSkillProgress(token: string): Promise<Record<string, SkillProgress>> {
-  const response = await api.get("/users/skill-progress", getAuthHeader(token));
-  return response.data;
+  return fetchWithCache(`skill-progress:${token}`, async () => {
+    const response = await api.get("/users/skill-progress", getAuthHeader(token));
+    return response.data;
+  }, 60 * 1000);
 }
 
 export async function getCourseDetail(courseId: number): Promise<CatalogCourse> {

@@ -9,7 +9,6 @@ import {
   getGapAnalysis, 
   getRoadmap, 
   getCatalogRoles, 
-  getCatalogCourses, 
   getUserSkillProgress,
   getDashboardCourseProgress,
   type CourseProgressSummary,
@@ -30,7 +29,6 @@ export default function RoadmapPage() {
   const [gap, setGap] = useState<GapAnalysis | null>(null);
   const [roadmap, setRoadmap] = useState<RoadmapLevel[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
-  const [courses, setCourses] = useState<any[]>([]);
   const [skillProgress, setSkillProgress] = useState<Record<string, any>>({});
   const [activeCourses, setActiveCourses] = useState<CourseProgressSummary[]>([]);
 
@@ -45,18 +43,16 @@ export default function RoadmapPage() {
     const loadData = async () => {
       try {
         setLoadingData(true);
-        const [gapData, roadmapData, rolesData, coursesData, progressData, activeCoursesData] = await Promise.all([
+        const [gapData, roadmapData, rolesData, progressData, activeCoursesData] = await Promise.all([
           getGapAnalysis(session.access_token),
           getRoadmap(session.access_token),
           getCatalogRoles(),
-          getCatalogCourses(),
           getUserSkillProgress(session.access_token).catch(() => ({})),
           getDashboardCourseProgress(session.access_token).catch(() => []),
         ]);
         setGap(gapData);
         setRoadmap(roadmapData);
         setRoles(rolesData);
-        setCourses(coursesData);
         setSkillProgress(progressData);
         setActiveCourses(activeCoursesData || []);
       } catch (err) {
@@ -177,7 +173,6 @@ export default function RoadmapPage() {
               totalLevels={roadmap.length}
               isCurrentLevel={lvl.level === activeLevelNumber}
               gap={gap}
-              courses={courses}
               activeCourses={activeCourses}
               skillProgress={skillProgress}
               defaultExpanded={true}

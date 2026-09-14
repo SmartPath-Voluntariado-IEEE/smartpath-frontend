@@ -13,7 +13,7 @@ interface LevelRowProps {
   totalLevels: number;
   isCurrentLevel: boolean;
   gap: GapAnalysis;
-  courses: any[];
+  courses?: any[];
   skillProgress?: Record<string, { percent: number }>;
   defaultExpanded?: boolean;
   activeCourses?: CourseProgressSummary[];
@@ -77,7 +77,7 @@ export function LevelRow({
   const levelProgressPercent = totalSkillsCount > 0 ? Math.round(levelProgressSum / totalSkillsCount) : 0;
 
   const coursesForSkill = (skillSlug: string) => {
-    return courses.filter((c) => c.skill_slugs?.includes(skillSlug));
+    return (courses || []).filter((c) => c.skill_slugs?.includes(skillSlug));
   };
 
   return (
