@@ -101,9 +101,6 @@ export function SkillMarketModal({
                     Diferenciador (Plus)
                   </span>
                 )}
-                <span className="text-xs font-medium text-emerald-600">
-                  {skill.freeCourseCount} cursos gratis disponibles
-                </span>
               </div>
             </div>
           </div>
