@@ -2,17 +2,20 @@
 
 import React from "react";
 import Link from "next/link";
+import { Info } from "lucide-react";
 import { SkillProgressRing } from "./SkillProgressRing";
 import { getSkillIcon } from "@/lib/skill-icon-map";
 import type { RoadmapSkill } from "@/types/roadmap";
+import type { CourseProgressSummary } from "@/services/api";
 
 interface SkillCardProps {
   skill: RoadmapSkill;
   progressPercent: number;
   courseCount: number;
-  /** Posición dentro del nivel: la primera es la de mayor prioridad. */
   rank: number;
   accentColorHex?: string;
+  activeCourse?: CourseProgressSummary | null;
+  onOpenMarketModal?: (skill: RoadmapSkill) => void;
 }
 
 export function SkillCard({
@@ -21,11 +24,13 @@ export function SkillCard({
   courseCount,
   rank,
   accentColorHex,
+  activeCourse,
+  onOpenMarketModal,
 }: SkillCardProps) {
   const isMastered = skill.isMastered || progressPercent === 100;
   const effectivePercent = isMastered ? 100 : progressPercent;
-  const freeCourses = skill.freeCourseCount ?? 0;
   const hasCourses = courseCount > 0;
+  const hasActiveCourse = Boolean(activeCourse && activeCourse.course_id);
 
   return (
     <div
@@ -33,7 +38,6 @@ export function SkillCard({
         isMastered ? "border-emerald-200/80 bg-emerald-50/20" : ""
       }`}
     >
-      {/* Badge de estado */}
       {isMastered ? (
         <span className="absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
           ✓ Dominada
@@ -44,12 +48,25 @@ export function SkillCard({
         </span>
       ) : null}
 
-      {/* Skill Title */}
-      <h4 className="mb-3 mt-1 text-center text-sm font-semibold text-text-primary line-clamp-1">
+      {onOpenMarketModal && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            onOpenMarketModal(skill);
+          }}
+          className="absolute right-2.5 top-2.5 flex h-6 w-6 items-center justify-center rounded-full text-text-secondary/70 transition-colors hover:bg-surface-variant hover:text-primary"
+          title="Ver motivo, horas y demanda laboral"
+          aria-label={`Consultar información de ${skill.name}`}
+        >
+          <Info className="h-3.5 w-3.5" />
+        </button>
+      )}
+
+      <h4 className="mb-3 mt-1 text-center text-sm font-semibold text-text-primary line-clamp-1 pr-4 pl-4">
         {skill.name}
       </h4>
 
-      {/* Progress Ring with Icon */}
       <div className="my-1 flex items-center justify-center">
         <SkillProgressRing
           percent={effectivePercent}
@@ -59,36 +76,60 @@ export function SkillCard({
         </SkillProgressRing>
       </div>
 
-      <p className="mt-3 text-center text-[11px] text-text-secondary">
-        ~{skill.estHours}h ·{" "}
-        {freeCourses > 0
-          ? `${freeCourses} ${freeCourses === 1 ? "curso gratis" : "cursos gratis"}`
-          : hasCourses
-            ? `${courseCount} de pago`
-            : "sin cursos aún"}
-      </p>
-
-      {/* Action Button */}
       <div className="mt-3 w-full text-center">
-        <Link
-          href={`/cursos?skill=${skill.skill_slug}`}
-          className={`inline-flex w-full items-center justify-center rounded-[10px] px-3 py-1.5 text-xs font-semibold border transition-colors ${
-            isMastered
-              ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+        {hasActiveCourse ? (
+          <p
+            className="truncate text-[11px] font-semibold text-primary px-1"
+            title={activeCourse?.course_title || "Curso asignado"}
+          >
+            {activeCourse?.course_title || "Curso asignado"}
+          </p>
+        ) : (
+          <p className="text-[11px] text-text-secondary">
+            {isMastered ? "Habilidad consolidada" : "Sin curso asignado"}
+          </p>
+        )}
+      </div>
+
+      <div className="mt-2.5 w-full space-y-1.5 text-center">
+        {hasActiveCourse ? (
+          <Link
+            href={`/courses/${activeCourse?.course_id}/modules`}
+            className="inline-flex w-full items-center justify-center rounded-[10px] bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-2xs transition hover:bg-primary/90"
+          >
+            Continuar & pruebas →
+          </Link>
+        ) : (
+          <Link
+            href={`/cursos?skill=${skill.skill_slug}`}
+            className={`inline-flex w-full items-center justify-center rounded-[10px] px-3 py-1.5 text-xs font-semibold border transition-colors ${
+              isMastered
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                : hasCourses
+                  ? "bg-white text-primary border-border-light hover:bg-surface-variant"
+                  : "pointer-events-none border-border-light bg-surface-dim text-text-secondary opacity-60"
+            }`}
+            aria-disabled={!hasCourses && !isMastered}
+          >
+            {isMastered
+              ? hasCourses
+                ? "Repasar cursos"
+                : "Dominada"
               : hasCourses
-                ? "bg-white text-primary border-border-light hover:bg-surface-variant"
-                : "pointer-events-none border-border-light bg-surface-dim text-text-secondary opacity-60"
-          }`}
-          aria-disabled={!hasCourses && !isMastered}
-        >
-          {isMastered
-            ? hasCourses
-              ? "Repasar cursos"
-              : "Dominada"
-            : hasCourses
-              ? "Ver cursos"
-              : "Sin cursos"}
-        </Link>
+                ? "Elegir curso"
+                : "Sin cursos"}
+          </Link>
+        )}
+
+        {onOpenMarketModal && (
+          <button
+            type="button"
+            onClick={() => onOpenMarketModal(skill)}
+            className="text-[11px] font-medium text-text-secondary transition-colors hover:text-primary hover:underline"
+          >
+            ¿Por qué en tu ruta?
+          </button>
+        )}
       </div>
     </div>
   );

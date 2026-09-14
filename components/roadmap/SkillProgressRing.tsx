@@ -22,12 +22,11 @@ export function SkillProgressRing({
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (clampedPercent / 100) * circumference;
 
-  // Determine stroke color if not explicitly provided
   const getStrokeColor = () => {
     if (ringColorHex) return ringColorHex;
-    if (clampedPercent >= 100) return "#00C48C"; // Mastered / Completed Green
-    if (clampedPercent > 0) return "#6E43FF"; // In Progress Purple
-    return "#FF8A00"; // Pending / 0% Orange
+    if (clampedPercent >= 100) return "#00C48C";
+    if (clampedPercent > 0) return "#6E43FF";
+    return "#FF8A00";
   };
 
   const strokeColor = getStrokeColor();
@@ -36,7 +35,6 @@ export function SkillProgressRing({
     <div className="relative inline-flex flex-col items-center justify-center">
       <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
         <svg width={size} height={size} className="-rotate-90 transform">
-          {/* Background Track Circle */}
           <circle
             cx={size / 2}
             cy={size / 2}
@@ -45,7 +43,6 @@ export function SkillProgressRing({
             strokeWidth={strokeWidth}
             fill="transparent"
           />
-          {/* Active Progress Circle */}
           <circle
             cx={size / 2}
             cy={size / 2}
@@ -60,7 +57,6 @@ export function SkillProgressRing({
           />
         </svg>
 
-        {/* Center Icon */}
         <div className="absolute inset-0 flex items-center justify-center">
           {children}
         </div>

@@ -4,7 +4,8 @@ import React, { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { SkillCard } from "./SkillCard";
-import type { RoadmapLevel, GapAnalysis } from "@/types/roadmap";
+import type { RoadmapLevel, GapAnalysis, RoadmapSkill } from "@/types/roadmap";
+import type { CourseProgressSummary } from "@/services/api";
 
 interface LevelRowProps {
   level: RoadmapLevel;
@@ -15,6 +16,8 @@ interface LevelRowProps {
   courses: any[];
   skillProgress?: Record<string, { percent: number }>;
   defaultExpanded?: boolean;
+  activeCourses?: CourseProgressSummary[];
+  onOpenMarketModal?: (skill: RoadmapSkill) => void;
 }
 
 const LEVEL_DESCRIPTIONS: Record<string, string> = {
@@ -45,16 +48,15 @@ export function LevelRow({
   courses,
   skillProgress = {},
   defaultExpanded = true,
+  activeCourses = [],
+  onOpenMarketModal,
 }: LevelRowProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   const levelColor = LEVEL_COLORS[level.level] || LEVEL_COLORS[1];
   const description = LEVEL_DESCRIPTIONS[level.label] || "Desarrolla las competencias de este nivel.";
 
-  // Calculate skill progress percentages
   const getSkillPercent = (slug: string): number => {
-    // Si hay progreso real de curso (backend: nivel declarado + módulos
-    // aprobados), úsalo — es más preciso que el nivel fijo del gap.
     if (skillProgress[slug]) {
       return Math.round(skillProgress[slug].percent);
     }
@@ -67,10 +69,9 @@ export function LevelRow({
       return Math.round((partialSkill.level / 5) * 100);
     }
 
-    return 0; // Missing
+    return 0;
   };
 
-  // Calculate overall level progress percent
   const totalSkillsCount = level.skills.length;
   const levelProgressSum = level.skills.reduce((acc, s) => acc + getSkillPercent(s.skill_slug), 0);
   const levelProgressPercent = totalSkillsCount > 0 ? Math.round(levelProgressSum / totalSkillsCount) : 0;
@@ -81,7 +82,6 @@ export function LevelRow({
 
   return (
     <div className="relative pb-8 last:pb-0">
-      {/* Vertical Timeline Dashed Line connecting nodes */}
       {levelIndex < totalLevels - 1 && (
         <div
           className="absolute left-5 top-10 bottom-0 w-0.5 border-l-2 border-dashed border-primary/30 md:left-6"
@@ -90,16 +90,13 @@ export function LevelRow({
       )}
 
       <div className="flex items-start gap-4 md:gap-6">
-        {/* Timeline Node */}
         <div
           className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white font-bold text-base shadow-glow md:h-12 md:w-12 md:text-lg ${levelColor.nodeBg}`}
         >
           {level.level}
         </div>
 
-        {/* Level Card */}
         <div className="surface-card flex-1 p-5 md:p-6 transition-all duration-200">
-          {/* Level Header Row */}
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3">
               <h3 className="font-display text-lg font-bold text-text-primary md:text-xl">
@@ -114,9 +111,6 @@ export function LevelRow({
                   Actual
                 </Badge>
               ) : null}
-              {/* El roadmap no se recorta al plazo del usuario: se marca
-                  desde dónde deja de caber, y él decide si amplía el plazo
-                  o sube sus horas semanales. */}
               {level.withinTarget === false && levelProgressPercent < 100 && (
                 <Badge className="border border-amber-200 bg-amber-50 font-semibold text-amber-700 hover:bg-amber-50">
                   Fuera de tu plazo
@@ -124,7 +118,6 @@ export function LevelRow({
               )}
             </div>
 
-            {/* Right Meta & Toggle */}
             <div className="flex items-center gap-3 self-end md:self-auto">
               <span className="text-xs font-semibold text-text-secondary">
                 {totalSkillsCount} {totalSkillsCount === 1 ? "skill" : "skills"}
@@ -140,12 +133,10 @@ export function LevelRow({
             </div>
           </div>
 
-          {/* Subtitle Description */}
           <p className="mt-1 text-xs text-text-secondary md:text-sm">
             {description}
           </p>
 
-          {/* Level Progress Bar */}
           <div className="mt-4 max-w-xs">
             <div className="mb-1 flex items-center justify-between text-xs font-medium text-text-secondary gap-2">
               <span>Progreso</span>
@@ -159,16 +150,18 @@ export function LevelRow({
             </div>
           </div>
 
-          {/* Skill Cards Grid (Accordion Content) */}
           {expanded && (
             <div className="mt-6 pt-4 border-t border-border-light">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5">
                 {level.skills.map((skill, skillIndex) => {
                   const percent = getSkillPercent(skill.skill_slug);
-                  // El backend ya devuelve el conteo; el catálogo local solo
-                  // se usa como respaldo si el campo aún no viene.
                   const courseCount =
                     skill.courseCount ?? coursesForSkill(skill.skill_slug).length;
+                  const activeCourse = activeCourses.find(
+                    (c) =>
+                      c.skill_slug?.toLowerCase().trim() === skill.skill_slug?.toLowerCase().trim() &&
+                      Boolean(c.course_id)
+                  );
                   return (
                     <SkillCard
                       key={skill.skill_slug}
@@ -177,6 +170,8 @@ export function LevelRow({
                       courseCount={courseCount}
                       rank={skillIndex}
                       accentColorHex={levelColor.hex}
+                      activeCourse={activeCourse}
+                      onOpenMarketModal={onOpenMarketModal}
                     />
                   );
                 })}
