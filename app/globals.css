@@ -177,8 +177,17 @@
   animation: tourFadeBlurIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+@keyframes tourPopoverFadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
 .reactour__popover {
-  animation: tourFadeBlurIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+  animation: tourPopoverFadeIn 0.25s ease-out forwards;
   max-width: min(390px, calc(100vw - 32px)) !important;
 }
 
