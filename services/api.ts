@@ -332,11 +332,18 @@ export async function selectCourseForSkill(
   return response.data;
 }
 
-/** Desvincula el curso de una skill y resetea el progreso asociado. */
-export async function unlinkCourseFromSkill(token: string, skillSlug: string): Promise<any> {
+/** Desvincula el curso de una skill y resetea el progreso asociado (opcionalmente curso especifico). */
+export async function unlinkCourseFromSkill(
+  token: string,
+  skillSlug: string,
+  courseId?: number
+): Promise<any> {
   const response = await api.delete(
     `/roadmap/skills/${skillSlug}/course`,
-    getAuthHeader(token)
+    {
+      ...getAuthHeader(token),
+      params: courseId ? { course_id: courseId } : undefined,
+    }
   );
   invalidateCache("progress");
   invalidateCache("roadmap");
@@ -354,10 +361,12 @@ export interface CourseModule {
   attempts: number;
 }
 
-/** Obtiene (o dispara la extracción con IA si no existen) los módulos de un curso. */
+/** Obtiene (o dispara la extracción con IA si no existen) los módulos de un curso con caché en memoria. */
 export async function getCourseModules(token: string, courseId: number): Promise<CourseModule[]> {
-  const response = await api.get(`/courses/${courseId}/modules`, getAuthHeader(token));
-  return response.data;
+  return fetchWithCache(`course-modules:${courseId}:${token}`, async () => {
+    const response = await api.get(`/courses/${courseId}/modules`, getAuthHeader(token));
+    return response.data;
+  }, 30 * 1000);
 }
 
 export interface QuizQuestion {
@@ -378,11 +387,24 @@ export interface QuizAnswer {
 }
 
 export interface QuizResult {
-  module_id: string;
-  score: number;
-  correct_answers: number;
-  total_questions: number;
   passed: boolean;
+  score: number;
+  correct_count: number;
+  total_questions: number;
+  feedback: {
+    question_id: string;
+    question: string;
+    correct: boolean;
+    user_answer: number;
+    correct_answer: number;
+    explanation: string;
+  }[];
+  skill_slug?: string;
+  skill_progress?: {
+    previous_level: number;
+    new_level: number;
+    percentage: number;
+  };
 }
 
 /** Envía las respuestas del examen de un módulo y devuelve el resultado. */
@@ -399,7 +421,23 @@ export async function submitModuleQuiz(
   invalidateCache("progress");
   invalidateCache("skill-progress");
   invalidateCache("roadmap");
+  invalidateCache("course-modules");
   return response.data;
+}
+
+export interface AssignedCourseItem {
+  course_id: number;
+  course_title: string;
+  course_url?: string | null;
+  platform?: string | null;
+  duration_hours?: number | null;
+  level?: string | null;
+  is_free?: boolean;
+  completed_modules: number;
+  total_modules: number;
+  percentage: number;
+  skill_percentage?: number;
+  is_completed: boolean;
 }
 
 export interface CourseProgressSummary {
@@ -407,7 +445,12 @@ export interface CourseProgressSummary {
   course_id: number | null;
   course_title: string | null;
   course_url: string | null;
-  progress: { completed: number; total: number; percentage: number } | null;
+  completed_modules?: number;
+  total_modules?: number;
+  course_percentage?: number;
+  skill_percentage?: number;
+  progress: { completed: number; total: number; percentage: number; skill_percentage?: number } | null;
+  assigned_courses?: AssignedCourseItem[];
 }
 
 /** Resumen de progreso de cursos por skill, para el dashboard. */
@@ -625,6 +668,8 @@ export async function getUserSkillProgress(token: string): Promise<Record<string
 }
 
 export async function getCourseDetail(courseId: number): Promise<CatalogCourse> {
-  const response = await api.get(`/courses/${courseId}`);
-  return response.data;
+  return fetchWithCache(`course-detail:${courseId}`, async () => {
+    const response = await api.get(`/courses/${courseId}`);
+    return response.data;
+  }, 60 * 1000);
 }
