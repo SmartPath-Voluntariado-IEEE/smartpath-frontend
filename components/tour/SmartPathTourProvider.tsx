@@ -75,7 +75,6 @@ export function SmartPathTourProvider({ children }: { children: React.ReactNode 
     },
     {
       selector: '[data-tour="dashboard-hero"]',
-      position: "bottom",
       content: () => (
         <div className="space-y-2 p-1 animate-tour-blur">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#6E43FF]">
@@ -205,6 +204,13 @@ export function SmartPathTourProvider({ children }: { children: React.ReactNode 
       beforeClose={() => {
         if (typeof window !== "undefined") {
           window.localStorage.setItem(TOUR_STORAGE_KEY, "true");
+          try {
+            const url = new URL(window.location.href);
+            if (url.searchParams.has("tour")) {
+              url.searchParams.delete("tour");
+              window.history.replaceState({}, "", url.pathname + (url.search ? url.search : ""));
+            }
+          } catch (e) {}
         }
       }}
       prevButton={({ currentStep, setCurrentStep }) =>
@@ -225,6 +231,13 @@ export function SmartPathTourProvider({ children }: { children: React.ReactNode 
               if (isLast) {
                 if (typeof window !== "undefined") {
                   window.localStorage.setItem(TOUR_STORAGE_KEY, "true");
+                  try {
+                    const url = new URL(window.location.href);
+                    if (url.searchParams.has("tour")) {
+                      url.searchParams.delete("tour");
+                      window.history.replaceState({}, "", url.pathname + (url.search ? url.search : ""));
+                    }
+                  } catch (e) {}
                 }
                 setIsOpen(false);
               } else {
@@ -261,9 +274,10 @@ function TourController() {
   const { setIsOpen, isOpen } = useTour();
   const searchParams = useSearchParams();
   const pathname = usePathname();
+  const hasTriggeredRef = React.useRef(false);
 
   useEffect(() => {
-    if (typeof window === "undefined" || isOpen) return;
+    if (typeof window === "undefined" || isOpen || hasTriggeredRef.current) return;
 
     const tourParam = searchParams.get("tour");
     const isCompleted = window.localStorage.getItem(TOUR_STORAGE_KEY) === "true";
@@ -279,6 +293,17 @@ function TourController() {
 
         if (targetElement && !isStillLoading) {
           clearInterval(interval);
+          hasTriggeredRef.current = true;
+
+          // Limpiar el parámetro de la URL inmediatamente para evitar bucles o recargas
+          if (tourParam === "true") {
+            try {
+              const url = new URL(window.location.href);
+              url.searchParams.delete("tour");
+              window.history.replaceState({}, "", url.pathname + (url.search ? url.search : ""));
+            } catch (e) {}
+          }
+
           // Breve pausa para asegurar transición visual suave tras terminar de cargar
           setTimeout(() => {
             setIsOpen(true);

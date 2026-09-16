@@ -3,6 +3,7 @@ import { API_BASE_URL } from "@/lib/constants";
 import type { UserProfile } from "@/lib/profile-store";
 
 import { supabase } from "@/lib/supabaseClient";
+import { fetchWithCache, invalidateCache } from "@/lib/request-cache";
 
 export const api = axios.create({
     baseURL: API_BASE_URL
@@ -87,6 +88,10 @@ export async function upsertBackendProfile(token: string, profile: UserProfile):
   };
 
   const response = await api.post("/users/profile", payload, getAuthHeader(token));
+  invalidateCache("roadmap");
+  invalidateCache("gap");
+  invalidateCache("progress");
+  invalidateCache("matches");
   return response.data;
 }
 
@@ -177,13 +182,17 @@ export function isOnboardingComplete(profile: any): boolean {
 }
 
 export async function getCatalogSkills(): Promise<any> {
-  const response = await api.get("/catalog/skills");
-  return response.data;
+  return fetchWithCache("catalog-skills", async () => {
+    const response = await api.get("/catalog/skills");
+    return response.data;
+  }, 10 * 60 * 1000);
 }
 
 export async function getCatalogJobs(): Promise<any> {
-  const response = await api.get("/catalog/jobs");
-  return response.data;
+  return fetchWithCache("catalog-jobs", async () => {
+    const response = await api.get("/catalog/jobs");
+    return response.data;
+  }, 10 * 60 * 1000);
 }
 
 // ============================================
@@ -230,15 +239,19 @@ export interface JobMatch {
 }
 
 export async function getMarketOverview(): Promise<MarketOverview> {
-  const response = await api.get("/market/overview");
-  return response.data;
+  return fetchWithCache("market-overview", async () => {
+    const response = await api.get("/market/overview");
+    return response.data;
+  }, 10 * 60 * 1000);
 }
 
 export async function getUserJobMatches(token: string): Promise<JobMatch[]> {
-  const response = await api.get("/users/job-matches", {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return response.data;
+  return fetchWithCache(`matches:${token}`, async () => {
+    const response = await api.get("/users/job-matches", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data;
+  }, 3 * 60 * 1000);
 }
 
 export interface CatalogCourse {
@@ -272,18 +285,24 @@ export async function getCatalogCourses(
 }
 
 export async function getCatalogRoles(): Promise<any> {
-  const response = await api.get("/catalog/roles");
-  return response.data;
+  return fetchWithCache("catalog-roles", async () => {
+    const response = await api.get("/catalog/roles");
+    return response.data;
+  }, 10 * 60 * 1000);
 }
 
 export async function getGapAnalysis(token: string): Promise<any> {
-  const response = await api.get("/users/gap-analysis", getAuthHeader(token));
-  return response.data;
+  return fetchWithCache(`gap:${token}`, async () => {
+    const response = await api.get("/users/gap-analysis", getAuthHeader(token));
+    return response.data;
+  }, 2 * 60 * 1000);
 }
 
 export async function getRoadmap(token: string): Promise<any> {
-  const response = await api.get("/users/roadmap", getAuthHeader(token));
-  return response.data;
+  return fetchWithCache(`roadmap:${token}`, async () => {
+    const response = await api.get("/users/roadmap", getAuthHeader(token));
+    return response.data;
+  }, 2 * 60 * 1000);
 }
 
 export async function getCourseRecommendations(token: string, skillSlug: string): Promise<any> {
@@ -308,15 +327,26 @@ export async function selectCourseForSkill(
       params: { course_id: courseId },
     }
   );
+  invalidateCache("progress");
+  invalidateCache("roadmap");
   return response.data;
 }
 
-/** Desvincula el curso de una skill y resetea el progreso asociado. */
-export async function unlinkCourseFromSkill(token: string, skillSlug: string): Promise<any> {
+/** Desvincula el curso de una skill y resetea el progreso asociado (opcionalmente curso especifico). */
+export async function unlinkCourseFromSkill(
+  token: string,
+  skillSlug: string,
+  courseId?: number
+): Promise<any> {
   const response = await api.delete(
     `/roadmap/skills/${skillSlug}/course`,
-    getAuthHeader(token)
+    {
+      ...getAuthHeader(token),
+      params: courseId ? { course_id: courseId } : undefined,
+    }
   );
+  invalidateCache("progress");
+  invalidateCache("roadmap");
   return response.data;
 }
 
@@ -331,10 +361,12 @@ export interface CourseModule {
   attempts: number;
 }
 
-/** Obtiene (o dispara la extracción con IA si no existen) los módulos de un curso. */
+/** Obtiene (o dispara la extracción con IA si no existen) los módulos de un curso con caché en memoria. */
 export async function getCourseModules(token: string, courseId: number): Promise<CourseModule[]> {
-  const response = await api.get(`/courses/${courseId}/modules`, getAuthHeader(token));
-  return response.data;
+  return fetchWithCache(`course-modules:${courseId}:${token}`, async () => {
+    const response = await api.get(`/courses/${courseId}/modules`, getAuthHeader(token));
+    return response.data;
+  }, 30 * 1000);
 }
 
 export interface QuizQuestion {
@@ -355,11 +387,24 @@ export interface QuizAnswer {
 }
 
 export interface QuizResult {
-  module_id: string;
-  score: number;
-  correct_answers: number;
-  total_questions: number;
   passed: boolean;
+  score: number;
+  correct_count: number;
+  total_questions: number;
+  feedback: {
+    question_id: string;
+    question: string;
+    correct: boolean;
+    user_answer: number;
+    correct_answer: number;
+    explanation: string;
+  }[];
+  skill_slug?: string;
+  skill_progress?: {
+    previous_level: number;
+    new_level: number;
+    percentage: number;
+  };
 }
 
 /** Envía las respuestas del examen de un módulo y devuelve el resultado. */
@@ -373,7 +418,26 @@ export async function submitModuleQuiz(
     answers,
     getAuthHeader(token)
   );
+  invalidateCache("progress");
+  invalidateCache("skill-progress");
+  invalidateCache("roadmap");
+  invalidateCache("course-modules");
   return response.data;
+}
+
+export interface AssignedCourseItem {
+  course_id: number;
+  course_title: string;
+  course_url?: string | null;
+  platform?: string | null;
+  duration_hours?: number | null;
+  level?: string | null;
+  is_free?: boolean;
+  completed_modules: number;
+  total_modules: number;
+  percentage: number;
+  skill_percentage?: number;
+  is_completed: boolean;
 }
 
 export interface CourseProgressSummary {
@@ -381,13 +445,20 @@ export interface CourseProgressSummary {
   course_id: number | null;
   course_title: string | null;
   course_url: string | null;
-  progress: { completed: number; total: number; percentage: number } | null;
+  completed_modules?: number;
+  total_modules?: number;
+  course_percentage?: number;
+  skill_percentage?: number;
+  progress: { completed: number; total: number; percentage: number; skill_percentage?: number } | null;
+  assigned_courses?: AssignedCourseItem[];
 }
 
 /** Resumen de progreso de cursos por skill, para el dashboard. */
 export async function getDashboardCourseProgress(token: string): Promise<CourseProgressSummary[]> {
-  const response = await api.get("/dashboard/course-progress", getAuthHeader(token));
-  return response.data;
+  return fetchWithCache(`progress:${token}`, async () => {
+    const response = await api.get("/dashboard/course-progress", getAuthHeader(token));
+    return response.data;
+  }, 60 * 1000);
 }
 
 // ============================================
@@ -590,11 +661,15 @@ export interface SkillProgress {
 }
 
 export async function getUserSkillProgress(token: string): Promise<Record<string, SkillProgress>> {
-  const response = await api.get("/users/skill-progress", getAuthHeader(token));
-  return response.data;
+  return fetchWithCache(`skill-progress:${token}`, async () => {
+    const response = await api.get("/users/skill-progress", getAuthHeader(token));
+    return response.data;
+  }, 60 * 1000);
 }
 
 export async function getCourseDetail(courseId: number): Promise<CatalogCourse> {
-  const response = await api.get(`/courses/${courseId}`);
-  return response.data;
+  return fetchWithCache(`course-detail:${courseId}`, async () => {
+    const response = await api.get(`/courses/${courseId}`);
+    return response.data;
+  }, 60 * 1000);
 }

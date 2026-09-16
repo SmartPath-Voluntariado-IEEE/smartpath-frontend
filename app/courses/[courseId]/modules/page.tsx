@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useRequireAuth } from "@/hooks/use-require-auth";
 import { QuizModal } from "@/components/courses/QuizModal";
+import { CourseModulesSkeleton } from "@/components/skeletons";
 import { getCourseDetail, getCourseModules, type CatalogCourse } from "@/services/api";
 
 const ASSET_GROUPS: Record<string, string> = {
@@ -110,11 +111,7 @@ export default function CourseModulesPage() {
   }, [session, courseId]);
 
   if (authLoading || loading) {
-    return (
-      <div className="grid min-h-[60vh] place-items-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <CourseModulesSkeleton />;
   }
 
   if (error || !course) {

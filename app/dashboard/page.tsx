@@ -113,15 +113,28 @@ export default function DashboardPage() {
     const loadAllData = async () => {
       try {
         setLoadingData(true);
-        const [rolesData, marketData] = await Promise.all([
+        const [
+          rolesData,
+          marketData,
+          backendProfile,
+          gapData,
+          roadmapData,
+          courseProgressData,
+          matchesData,
+        ] = await Promise.all([
           getCatalogRoles().catch(() => []),
           getMarketOverview().catch(() => null),
+          getBackendProfile(session.access_token).catch(() => null),
+          getGapAnalysis(session.access_token).catch(() => null),
+          getRoadmap(session.access_token).catch(() => []),
+          getDashboardCourseProgress(session.access_token).catch(() => []),
+          getUserJobMatches(session.access_token).catch(() => []),
         ]);
+
         setRoles(rolesData && rolesData.length > 0 ? rolesData : []);
         if (marketData) setMarketOverview(marketData);
 
-        let profileData = await getBackendProfile(session.access_token).catch(() => null);
-
+        let profileData = backendProfile;
         if (!profileData) {
           const local = loadProfile();
           if (local && local.onboardingComplete) {
@@ -159,29 +172,16 @@ export default function DashboardPage() {
           createdAt: profileData.created_at || new Date().toISOString(),
         };
         save(mappedProfile);
-        
-        try {
-          const [gapData, roadmapData, courseProgressData, matchesData] = await Promise.all([
-            getGapAnalysis(session.access_token),
-            getRoadmap(session.access_token),
-            getDashboardCourseProgress(session.access_token).catch(() => []),
-            getUserJobMatches(session.access_token).catch(() => []),
-          ]);
 
-          setGap(gapData);
-          setRoadmap(roadmapData);
-          setJobMatches(Array.isArray(matchesData) ? matchesData : []);
+        setGap(gapData || { target_role: null, mastered: [], partial: [], missing: [], coverage: 0 });
+        setRoadmap(roadmapData || []);
+        setJobMatches(Array.isArray(matchesData) ? matchesData : []);
 
-          const validCourses = Array.isArray(courseProgressData)
-            ? courseProgressData.filter((c: any) => c && (c.course_id || c.id))
-            : [];
+        const validCourses = Array.isArray(courseProgressData)
+          ? courseProgressData.filter((c: any) => c && (c.course_id || c.id))
+          : [];
 
-          setEnrolledCourses(validCourses);
-        } catch (gapErr) {
-          console.warn("No se pudieron cargar brecha y roadmap:", gapErr);
-          setGap({ target_role: null, mastered: [], partial: [], missing: [], coverage: 0 });
-          setRoadmap([]);
-        }
+        setEnrolledCourses(validCourses);
       } catch (err: any) {
         console.error("Error al conectar con el backend:", err);
         if (err?.response?.status === 401) {

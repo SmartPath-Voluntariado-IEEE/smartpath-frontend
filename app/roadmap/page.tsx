@@ -5,10 +5,19 @@ import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { useProfile } from "@/hooks/use-profile";
 import { useRequireAuth } from "@/hooks/use-require-auth";
-import { getGapAnalysis, getRoadmap, getCatalogRoles, getCatalogCourses, getUserSkillProgress } from "@/services/api";
+import { 
+  getGapAnalysis, 
+  getRoadmap, 
+  getCatalogRoles, 
+  getUserSkillProgress,
+  getDashboardCourseProgress,
+  type CourseProgressSummary,
+} from "@/services/api";
 import { RoadmapHeader } from "@/components/roadmap/RoadmapHeader";
 import { LevelRow } from "@/components/roadmap/LevelRow";
-import type { RoadmapLevel, GapAnalysis } from "@/types/roadmap";
+import { RoadmapDetailSection } from "@/components/roadmap/RoadmapDetailSection";
+import { SkillMarketModal } from "@/components/roadmap/SkillMarketModal";
+import type { RoadmapLevel, GapAnalysis, RoadmapSkill } from "@/types/roadmap";
 
 import { RoadmapSkeleton } from "@/components/skeletons";
 
@@ -20,26 +29,32 @@ export default function RoadmapPage() {
   const [gap, setGap] = useState<GapAnalysis | null>(null);
   const [roadmap, setRoadmap] = useState<RoadmapLevel[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
-  const [courses, setCourses] = useState<any[]>([]);
   const [skillProgress, setSkillProgress] = useState<Record<string, any>>({});
+  const [activeCourses, setActiveCourses] = useState<CourseProgressSummary[]>([]);
+
+  const [marketModalSkill, setMarketModalSkill] = useState<{
+    skill: RoadmapSkill;
+    isCore: boolean;
+    activeCourse?: CourseProgressSummary | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!session) return;
     const loadData = async () => {
       try {
         setLoadingData(true);
-        const [gapData, roadmapData, rolesData, coursesData, progressData] = await Promise.all([
+        const [gapData, roadmapData, rolesData, progressData, activeCoursesData] = await Promise.all([
           getGapAnalysis(session.access_token),
           getRoadmap(session.access_token),
           getCatalogRoles(),
-          getCatalogCourses(),
           getUserSkillProgress(session.access_token).catch(() => ({})),
+          getDashboardCourseProgress(session.access_token).catch(() => []),
         ]);
         setGap(gapData);
         setRoadmap(roadmapData);
         setRoles(rolesData);
-        setCourses(coursesData);
         setSkillProgress(progressData);
+        setActiveCourses(activeCoursesData || []);
       } catch (err) {
         console.error("Error al cargar datos del roadmap:", err);
       } finally {
@@ -77,6 +92,21 @@ export default function RoadmapPage() {
       </div>
     );
   }
+
+  const handleOpenMarketModal = (skill: RoadmapSkill, isCore?: boolean) => {
+    const coreSlugs = new Set(gap.target_role?.core_skill_slugs || []);
+    const userActiveCourse =
+      activeCourses.find(
+        (c) =>
+          c.skill_slug?.toLowerCase().trim() === skill.skill_slug?.toLowerCase().trim() &&
+          Boolean(c.course_id)
+      ) || null;
+    setMarketModalSkill({
+      skill,
+      isCore: isCore ?? coreSlugs.has(skill.skill_slug),
+      activeCourse: userActiveCourse,
+    });
+  };
 
   const totalHours = roadmap.reduce(
     (acc, lvl) => acc + lvl.skills.reduce((sum, s) => sum + s.estHours, 0),
@@ -135,13 +165,31 @@ export default function RoadmapPage() {
               totalLevels={roadmap.length}
               isCurrentLevel={lvl.level === activeLevelNumber}
               gap={gap}
-              courses={courses}
+              activeCourses={activeCourses}
               skillProgress={skillProgress}
               defaultExpanded={true}
+              onOpenMarketModal={(skill) => handleOpenMarketModal(skill)}
             />
           ))}
         </div>
       )}
+
+      <RoadmapDetailSection
+        roadmap={roadmap}
+        gap={gap}
+        targetRoleLabel={targetRole.label}
+        onSelectSkillForMarket={(skill, isCore) => handleOpenMarketModal(skill, isCore)}
+        skillProgress={skillProgress}
+      />
+
+      <SkillMarketModal
+        isOpen={Boolean(marketModalSkill)}
+        onClose={() => setMarketModalSkill(null)}
+        skill={marketModalSkill?.skill ?? null}
+        isCore={marketModalSkill?.isCore ?? false}
+        targetRoleLabel={targetRole.label}
+        activeCourse={marketModalSkill?.activeCourse}
+      />
     </div>
   );
 }
