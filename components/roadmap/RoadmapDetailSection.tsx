@@ -43,7 +43,7 @@ export function RoadmapDetailSection({
   const totalHours = roadmap.reduce((acc, lvl) => acc + (lvl.estHours || 0), 0);
 
   return (
-    <section className="surface-card mb-8 overflow-hidden rounded-2xl border border-border-light bg-white p-5 shadow-sm md:p-6">
+    <section className="my-10 surface-card mb-8 overflow-hidden rounded-2xl border border-border-light bg-white p-5 shadow-sm md:p-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="font-display mt-2 text-lg font-bold text-text-primary md:text-xl">

@@ -135,14 +135,6 @@ export default function RoadmapPage() {
         />
       </div>
 
-      <RoadmapDetailSection
-        roadmap={roadmap}
-        gap={gap}
-        targetRoleLabel={targetRole.label}
-        onSelectSkillForMarket={(skill, isCore) => handleOpenMarketModal(skill, isCore)}
-        skillProgress={skillProgress}
-      />
-
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h2 className="font-display text-xl font-bold text-text-primary md:text-2xl">
@@ -181,6 +173,14 @@ export default function RoadmapPage() {
           ))}
         </div>
       )}
+
+      <RoadmapDetailSection
+        roadmap={roadmap}
+        gap={gap}
+        targetRoleLabel={targetRole.label}
+        onSelectSkillForMarket={(skill, isCore) => handleOpenMarketModal(skill, isCore)}
+        skillProgress={skillProgress}
+      />
 
       <SkillMarketModal
         isOpen={Boolean(marketModalSkill)}
