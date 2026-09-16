@@ -145,15 +145,6 @@ export function SkillCard({
                 {isCourseFullyCompleted ? "Repasar módulo" : "Continuar & pruebas →"}
               </Link>
 
-              {assignedCourses.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setIsAssignedModalOpen(true)}
-                  className="w-full text-[11px] font-semibold text-primary hover:underline text-center py-0.5"
-                >
-                  Ver cursos asignados ({assignedCourses.length})
-                </button>
-              )}
             </div>
           ) : (
             <Link

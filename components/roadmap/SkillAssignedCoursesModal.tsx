@@ -48,14 +48,6 @@ export function SkillAssignedCoursesModal({
     >
       <div className="surface-card relative flex w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-border-light bg-white shadow-2xl animate-in fade-in zoom-in-95 max-h-[85vh]">
         <div className="flex items-center justify-between border-b border-border-light px-6 py-4">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-              Cursos Asignados
-            </span>
-            <span className="text-xs text-text-secondary">
-              {courses.length} {courses.length === 1 ? "curso vinculado" : "cursos vinculados"}
-            </span>
-          </div>
           <button
             type="button"
             onClick={onClose}
